@@ -13,7 +13,9 @@ import {
   Alert,
   Skeleton,
 } from '@mui/material'
-import { ExpandMore, ExpandLess, Error as ErrorIcon } from '@mui/icons-material'
+import ExpandMore from '@mui/icons-material/ExpandMore'
+import ExpandLess from '@mui/icons-material/ExpandLess'
+import ErrorIcon from '@mui/icons-material/Error'
 
 interface ImageData {
   url: string
@@ -170,8 +172,27 @@ const ImageGalleryWidget = observer(
     const validateUrls = config?.validateUrls ?? true
     const maxImages = config?.maxImages ?? 50
 
+    // Log whenever the widget mounts or the feature prop changes so we can trace
+    // why the widget may not be rendering for selected features.
+    useEffect(() => {
+      // eslint-disable-next-line no-console
+      console.debug('ImageGalleryWidget mounted/updated', {
+        featureSummary: {
+          images: feature?.get('images'),
+          image_labels: feature?.get('image_labels'),
+          image_types: feature?.get('image_types'),
+        },
+        featureObject: feature,
+      })
+    }, [feature])
+
     // Parse images from feature attributes (simple, lint-friendly)
     const parseImages = useCallback((): ImageData[] => {
+      // Check if feature is defined before calling .get()
+      if (!feature) {
+        return []
+      }
+      
       const images = feature.get('images')
       const imageLabels = feature.get('image_labels')
       const imageTypes = feature.get('image_types')

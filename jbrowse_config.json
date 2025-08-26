@@ -163,12 +163,12 @@
       "adapter": {
         "type": "Gff3TabixAdapter",
         "gffGzLocation": {
-          "uri": "http://localhost:9000/dist/test.gff3.gz",
+          "uri": "http://localhost:9000/test.gff3.gz",
           "locationType": "UriLocation"
         },
         "index": {
           "location": {
-            "uri": "http://localhost:9000/dist/test.gff3.gz.tbi",
+            "uri": "http://localhost:9000/test.gff3.gz.tbi",
             "locationType": "UriLocation"
           }
         }
