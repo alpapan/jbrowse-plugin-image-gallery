@@ -11,9 +11,8 @@ A JBrowse 2 plugin that displays images within feature details. Images appear au
 ### Method 2: Manual Installation
 
 Option 1:
-```bash
-wget https://github.com/alpapan/jbrowse-plugin-image-gallery/releases/download/rc-1/jbrowse-plugin-image-gallery.umd.production.min.js
-```
+Go to https://github.com/alpapan/jbrowse-plugin-image-gallery/releases
+download the jbrowse-plugin-image-gallery.umd.production.min.js
 
 Option 2:
 
