@@ -2,6 +2,8 @@
 
 A JBrowse 2 plugin that displays images within feature details. Images appear automatically when selecting features with image data.
 
+<img width="1149" height="1069" alt="image" src="https://github.com/user-attachments/assets/d143551d-769e-448e-8ca4-5f8cec414a34" />
+
 ## Installation
 
 ### Method 1: Add Plugin via JBrowse plugin store (not yet)
