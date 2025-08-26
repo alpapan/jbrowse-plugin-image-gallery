@@ -278,6 +278,16 @@ const ImageGalleryWidget = observer(
         } else {
           imageData.isValid = true
         }
+        
+        // Debug logging for each image
+        // eslint-disable-next-line no-console
+        console.debug(`Image ${index}:`, {
+          url,
+          isValid: imageData.isValid,
+          hasError: imageData.hasError,
+          errorMessage: imageData.errorMessage
+        })
+        
         return imageData
       })
     }, [actualFeature, actualFeatureImages, maxImages, validateUrls])
@@ -316,6 +326,13 @@ const ImageGalleryWidget = observer(
       },
       [images],
     )
+
+    // Debug logging for render decision
+    // eslint-disable-next-line no-console
+    console.debug('ImageGallery render decision:', {
+      imagesCount: images.length,
+      images: images.map(img => ({ url: img.url, hasError: img.hasError, isValid: img.isValid }))
+    })
 
     // Don't render widget if no images
     if (images.length === 0) {
