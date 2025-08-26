@@ -1,5 +1,5 @@
 {
-  "name": "jbrowse-plugin-image-gallery",
+  "name": "jbrowse-plugin-image-gallery-plugin",
   "version": "0.0.1",
   "private": false,
   "description": "Images for features",
@@ -101,7 +101,7 @@
   "module": "dist/index.esm.js",
   "typings": "dist/index.d.ts",
   "jbrowse-plugin": {
-    "name": "ImageGallery"
+    "name": "ImageGalleryPlugin"
   },
   "dependencies": {
     "@mui/icons-material": "^7.3.1",
