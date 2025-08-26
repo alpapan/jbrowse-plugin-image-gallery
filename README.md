@@ -1,193 +1,194 @@
-# jbrowse-plugin-template
+# JBrowse Plugin Image Gallery
 
-> Template to quickly start a new JBrowse plugin
+A JBrowse 2 plugin that provides an **ImageGalleryView** to display images directly within feature details, eliminating the need to switch between separate widget tabs when investigating hundreds of features.
+
+## Overview
+
+This plugin solves a critical UX problem in JBrowse 2: when users need to examine images for many features, they previously had to click separate Images widget tabs for every feature. The **ImageGalleryView** automatically appears in the view panel when features with images are selected, providing immediate visual context without additional clicks.
+
+## Features
+
+- **Automatic Display**: Images appear instantly when selecting features with image data
+- **Lazy Loading**: Optimized performance with intersection observer-based image loading  
+- **Error Handling**: Graceful fallbacks for broken or invalid image URLs
+- **URL Validation**: Checks image URL formats before attempting to load
+- **Material-UI Styling**: Consistent with JBrowse 2's design system
+- **Expandable Gallery**: Collapsible interface with image count and error indicators
+- **Click to Enlarge**: Images open in new tabs when clicked
+- **Multiple Formats**: Supports various image types (JPG, PNG, GIF, SVG, etc.)
+
+## Installation
+
+### From NPM (when published)
+```bash
+jbrowse add-plugin jbrowse-plugin-image-gallery
+```
+
+### From Source
+```bash
+git clone https://github.com/your-repo/jbrowse-plugin-image-gallery.git
+cd jbrowse-plugin-image-gallery
+npm install
+npm run build
+jbrowse add-plugin /path/to/jbrowse-plugin-image-gallery
+```
 
 ## Usage
 
-You can use this template to create a new GitHub repository or a new local
-project.
+### Automatic Mode
+The ImageGalleryView automatically appears when you select features containing image data. Simply click on any feature in your tracks, and if it has images, they'll be displayed in the view panel.
 
-### Software requirements
+### Manual Mode  
+You can also manually add an ImageGalleryView:
+1. Right-click in the view area
+2. Select "Add" → "Image Gallery View"
+3. The view will show "No Feature Selected" until you select a feature with images
 
-- [git](https://git-scm.com/downloads)
-- [Node.js](https://nodejs.org/en/download/) (version 10 or greater)
-- npm (which comes with Node.js)
-- [yarn](https://yarnpkg.com/en/docs/install) (optional)
-- [JBrowse 2](https://github.com/gmod/jbrowse-components) (version 2.0 or
-  greater)
+## Feature Data Requirements
 
-### Create a new project from this template
+For images to display, features must have one of the following attributes:
 
-You can click the "Use this template" button in the repository (instructions
-[here](https://docs.github.com/en/free-pro-team@latest/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template)):
-
-![screenshot showing where "Use this template" button is in the GitHub repository page](https://user-images.githubusercontent.com/25592344/102671843-eb8ae380-414c-11eb-84e5-6ebf10bd89f9.png)
-
-Or you can use the GitHub CLI:
-
-```console
-$ gh repo create jbrowse-plugin-my-project --template https://github.com/GMOD/jbrowse-plugin-template.git
+### Primary Method: `images` attribute
+```gff3
+chr1    source    gene    1000    2000    .    +    .    ID=gene1;images=https://example.com/image1.jpg,https://example.com/image2.png
 ```
 
-Or you can start a plugin locally:
-
-```console
-$ git clone https://github.com/GMOD/jbrowse-plugin-template.git jbrowse-plugin-my-project
-$ cd jbrowse-plugin-my-project
-$ rm -rf .git
-$ # If you want to use Git, re-initialize it
-$ git init
+### With Labels and Types (Optional)
+```gff3
+chr1    source    gene    1000    2000    .    +    .    ID=gene1;images=https://example.com/image1.jpg,https://example.com/image2.png;image_labels=Microscopy,Western Blot;image_types=experiment,analysis
 ```
 
-## Getting started
+### Supported Formats
+- **Single URL**: `images=https://example.com/image.jpg`
+- **Multiple URLs**: `images=https://example.com/image1.jpg,https://example.com/image2.png`
+- **Array format**: Also supports programmatic array inputs
 
-### Setup
+## Configuration Options
 
-Run `npm init` and answer the prompts to fill out the information for your
-plugin:
+The ImageGalleryView supports several configuration options:
 
-- Make sure you at least enter a "name" (probably starting with
-  "jbrowse-plugin-", or "@myscope/jbrowse-plugin-" if you're going to publish to
-  an NPM organization)
-- Other fields may be left blank
-- Leave the "entry point" as `dist/index.js`
+| Option | Default | Description |
+|--------|---------|-------------|
+| `maxImages` | 50 | Maximum number of images to display |
+| `maxImageHeight` | 200 | Maximum height in pixels for displayed images |
+| `maxImageWidth` | 300 | Maximum width in pixels for displayed images |
+| `enableLazyLoading` | true | Use intersection observer for performance |
+| `validateUrls` | true | Validate image URL formats before loading |
 
-Now run `yarn` (or `npm install` to use npm instead of yarn) to install the
-necessary dependencies.
+## Technical Architecture
 
-After this, run `yarn setup` (or `npm run setup`). This configures your project,
-and adds a build of JBrowse 2 that can be used to test your plugin during
-development.
+### ImageGalleryView Components
 
-### Build
+#### State Model (`src/ImageGalleryView/stateModel.ts`)
+- **MobX State Tree** model managing feature data
+- **Actions**: `updateFeature()`, `clearFeature()`  
+- **Computed Properties**: `hasImages`, `displayTitle`
+- **Reactive Updates**: Automatically responds to feature selection changes
 
-```console
-$ yarn build ## or `npm run build`
+#### React Component (`src/ImageGalleryView/components/ImageGalleryView.tsx`)
+- **Self-contained**: All functionality merged from previous widget architecture
+- **Material-UI Design**: Consistent Paper, Card, and Typography components
+- **LazyImage Component**: Custom intersection observer-based lazy loading
+- **Error Boundaries**: Graceful handling of loading failures
+
+#### Plugin Registration (`src/index.ts`)
+- **ViewType Registration**: Integrates with JBrowse 2's plugin system
+- **Autorun Logic**: MobX autorun monitors session.selection changes
+- **Menu Integration**: Adds "Image Gallery View" to the Add menu
+
+### Image Processing Pipeline
+
+1. **Feature Selection**: User clicks feature in track
+2. **Data Extraction**: Plugin extracts `images`, `image_labels`, `image_types` attributes  
+3. **URL Parsing**: Handles single strings, comma-separated lists, or arrays
+4. **Validation**: Optional URL format validation (file extensions, protocols)
+5. **Lazy Loading**: Images load as they enter viewport via IntersectionObserver
+6. **Error Handling**: Invalid URLs show error icons with descriptive messages
+7. **Display**: Images render in responsive grid with labels and type indicators
+
+### Session Management
+
+The plugin uses MobX autorun to monitor JBrowse session changes:
+- **Reactive**: Automatically responds to `session.selection` changes
+- **View Lifecycle**: Creates/updates ImageGalleryView instances as needed
+- **Cleanup**: Clears view content when no feature with images is selected
+- **Error Safety**: Null-safe operations prevent crashes during session state changes
+
+## Development
+
+### Setup Development Environment
+```bash
+git clone https://github.com/your-repo/jbrowse-plugin-image-gallery.git
+cd jbrowse-plugin-image-gallery
+npm install
+npm run setup
 ```
 
-### Development
+### Development Workflow
+```bash
+# Start development server with hot reloading
+npm start
 
-To develop against JBrowse Web:
+# Lint and format code
+npm run lint
 
-- Start a development version of JBrowse Web (see
-  [here](https://github.com/GMOD/jbrowse-components/blob/master/CONTRIBUTING.md))
-- In this project, run `yarn start` (or `npm run start`)
-- Assuming JBrowse Web is being served on port 3000, navigate in your web
-  browser to
-  http://localhost:3000/?config=http://localhost:9000/jbrowse_config.json
-- When you make changes to your plugin, it will automatically be re-built. You
-  can then refresh JBrowse Web to see the changes.
+# Build for production
+npm run build
 
-**Note:** The current version of `jbrowse-plugin-template` is only compatible
-with "JBrowse 2" v2.0 or greater. If you are developing for a version of
-"JBrowse 2" v1.x, please consider upgrading, or you will have to manually
-downgrade the package dependencies in this template to ensure compatibility.
-
-### Testing
-
-To test your plugin, there are several commands available:
-
-#### `yarn browse` or `npm run browse`
-
-Launches your local JBrowse 2 build that is used for integration testing, with
-your plugin already included in the configuration. Your plugin must also be
-running (`yarn start` or `npm run start`).
-
-#### `yarn test` or `npm test`
-
-Runs any unit tests defined during plugin development.
-
-#### `yarn cypress:run` or `npm run cypress:run`
-
-Runs the [cypress](https://www.cypress.io/) integration tests for your plugin.
-Both the plugin and `browse` must already be running.
-
-#### `yarn test:e2e` or `npm run test:e2e`
-
-Starts up the JBrowse 2 build as well as your plugin, and runs the
-[cypress](https://www.cypress.io/) integration tests against them. Closes both
-resources after tests finish.
-
-#### `yarn cypress` or `npm run cypress`
-
-Launches the [cypress](https://www.cypress.io/) test runner, which can be very
-useful for writing integration tests for your plugin. Both the plugin and
-`browse` must already be running.
-
-#### Github Action
-
-This template includes a [Github action](https://github.com/features/actions)
-that runs your integration tests when you push new changes to your repository.
-
-### Publishing to NPM
-
-Once you have developed your plugin, you can publish it to NPM. Remember to
-remove `"private": true` from `package.json` before doing so.
-
-### Using plugins with embedded components
-
-If you are using plugins in the embedded apps such as
-`@jbrowse/react-linear-genome-view`, then you can install jbrowse plugins such
-as this one using normal "npm install jbrowse-plugin-yourplugin" if you have
-published them to NPM, and use code like this
-
-```typescript
-import React from 'react'
-import ViewType from '@jbrowse/core/pluggableElementTypes/ViewType'
-import PluginManager from '@jbrowse/core/PluginManager'
-import Plugin from '@jbrowse/core/Plugin'
-
-// in your code
-import { createViewState, JBrowseLinearGenomeView } from '@jbrowse/react-linear-genome-view'
-import MyPlugin from 'jbrowse-plugin-yourplugin'
-
-export const MyApp = () => {
-  const state = createViewState({
-    assembly: {/*...your assembly config...*/},
-    plugins: [MyPlugin],
-    tracks: [/*...your track configs...*/],
-    location: 'ctgA:1105..1221',
-  })
-
-  return (
-    <JBrowseLinearGenomeView viewState={state} />
-  )
-}
+# Run tests
+npm test
 ```
 
-See https://jbrowse.org/storybook/lgv/main/?path=/docs/using-plugins--docs for
-live example, and also method for loading plugins from urls instead of from NPM
-in embedded
-
-### Using plugins with JBrowse Web
-
-If you are using JBrowse Web, after the plugin is published to NPM, you can use
-[unpkg](https://unpkg.com/) to host plugin bundle. The plugin can then be
-referenced by URL in the config.json
-
-A JBrowse Web config using this plugin would look like this:
-
-```json
-{
-  "plugins": [
-    {
-      "name": "MyProject",
-      "url": "https://unpkg.com/jbrowse-plugin-my-project/dist/jbrowse-plugin-my-project.umd.production.min.js"
-    }
-  ]
-}
+### Project Structure
+```
+src/
+├── index.ts                 # Plugin registration and autorun logic
+├── ImageGalleryView/
+│   ├── index.ts            # Export view components
+│   ├── stateModel.ts       # MobX state tree model
+│   └── components/
+│       └── ImageGalleryView.tsx  # Main React component
+└── declare.d.ts            # TypeScript declarations
 ```
 
-You can also use a specific version in unpkg, such as
-`https://unpkg.com/jbrowse-plugin-my-project@1.0.1/dist/jbrowse-plugin-my-project.umd.production.min.js`
+## Troubleshooting
 
-### TypeScript vs. JavaScript
+### Images Not Displaying
+1. **Check Feature Attributes**: Ensure features have `images` attribute with valid URLs
+2. **URL Validation**: Verify image URLs are accessible and have valid extensions
+3. **CORS Issues**: Ensure image servers allow cross-origin requests
+4. **Console Errors**: Check browser developer tools for network or JavaScript errors
 
-This template is set up in such a way that you can use both TypeScript and
-JavaScript for development. If using only JavaScript, you can change
-`src/index.ts` to `src/index.js`.
+### Performance Issues
+1. **Limit Image Count**: Use `maxImages` config to reduce initial load
+2. **Enable Lazy Loading**: Ensure `enableLazyLoading` is true (default)
+3. **Image Optimization**: Use appropriately sized images for web display
+4. **Network Throttling**: Consider image CDN or optimization services
 
-If using only TypeScript, you can remove `"allowJs": true` from `tsconfig.json`
-and `"@babel/preset-react"` from `.babelrc` (and from "devDependencies" in
-`package.json`).
+### View Not Appearing
+1. **Plugin Loading**: Verify plugin is properly installed and loaded
+2. **Feature Selection**: Ensure you're clicking on features with image data
+3. **Session State**: Check that session.selection is updating properly
+4. **Browser Compatibility**: Ensure IntersectionObserver is supported (modern browsers)
 
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature-name`  
+3. Make your changes and add tests
+4. Ensure linting passes: `npm run lint`
+5. Submit a pull request
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Authors
+
+- **Alexie Papanicolaou** - *Initial work* - [alpapan@gmail.com](mailto:alpapan@gmail.com)
+
+## Acknowledgments
+
+- JBrowse 2 development team for the plugin architecture
+- Material-UI for the component library
+- MobX for reactive state management
