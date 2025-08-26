@@ -52,8 +52,9 @@ export default class ImageGalleryPlugin extends Plugin {
             if (f && typeof f.get === 'function') {
               featureSummary = {
                 id: f.get('id'),
-                images: f.get('images'),
-                image_labels: f.get('image_labels'),
+                images: f.get('image') || f.get('images'), // Primary: 'image', fallback: 'images'
+                image_group: f.get('image_group'),
+                image_tag: f.get('image_tag'),
               }
             } else {
               featureSummary = String(f)
@@ -80,7 +81,7 @@ export default class ImageGalleryPlugin extends Plugin {
               // console.debug('Managing ImageGalleryView for feature:', {
               //   featureId: featureSummary.id,
               //   featureImages: featureSummary.images,
-              //   featureImageLabels: featureSummary.image_labels,
+              //   featureImageLabels: featureSummary.image_group,
               //   viewId: viewId,
               // })
 
@@ -107,21 +108,25 @@ export default class ImageGalleryPlugin extends Plugin {
                 const imagesString = Array.isArray(featureSummary.images)
                   ? featureSummary.images.join(',')
                   : featureSummary.images
-                const labelsString = Array.isArray(featureSummary.image_labels)
-                  ? featureSummary.image_labels.join(',')
-                  : featureSummary.image_labels
+                const labelsString = Array.isArray(featureSummary.image_group)
+                  ? featureSummary.image_group.join(',')
+                  : featureSummary.image_group
+                const typesString = Array.isArray(featureSummary.image_tag)
+                  ? featureSummary.image_tag.join(',')
+                  : featureSummary.image_tag
 
                 imageGalleryView.updateFeature(
                   featureSummary.id || 'unknown',
                   imagesString,
                   labelsString,
+                  typesString,
                 )
                 // eslint-disable-next-line no-console
                 // console.debug('Updated ImageGalleryView with feature data:', {
                 //   featureId: featureSummary.id,
                 //   images: featureSummary.images,
                 //   imagesString,
-                //   imageLabels: featureSummary.image_labels,
+                //   imageLabels: featureSummary.image_group,
                 //   labelsString,
                 // })
               }

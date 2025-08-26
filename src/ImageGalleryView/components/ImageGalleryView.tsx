@@ -16,7 +16,6 @@ import {
 } from '@mui/material'
 import ExpandMore from '@mui/icons-material/ExpandMore'
 import ExpandLess from '@mui/icons-material/ExpandLess'
-import ErrorIcon from '@mui/icons-material/Error'
 interface ImageData {
   url: string
   label: string
@@ -52,6 +51,7 @@ interface ImageGalleryViewProps {
     selectedFeatureId?: string
     featureImages?: string
     featureImageLabels?: string
+    featureImageTypes?: string
     hasImages: boolean
     displayTitle: string
   }
@@ -191,16 +191,20 @@ const LazyImage: React.FC<{
 const ImageGalleryContent = observer(function ImageGalleryContent({
   featureImages,
   featureImageLabels,
+  featureImageTypes,
   feature,
   config,
 }: {
   featureImages?: string | string[]
   featureImageLabels?: string
+  featureImageTypes?: string
   feature?: Feature
   config?: ImageGalleryConfig
 }) {
   const actualConfig = config ?? {}
-  const [expandedGroups, setExpandedGroups] = useState<Map<string, boolean>>(new Map())
+  const [expandedGroups, setExpandedGroups] = useState<Map<string, boolean>>(
+    new Map(),
+  )
   const [imageStates, setImageStates] = useState<Map<number, ImageData>>(
     new Map(),
   )
@@ -233,10 +237,10 @@ const ImageGalleryContent = observer(function ImageGalleryContent({
       }
     }
 
-    // Fallback to feature.get('images') for backward compatibility
+    // Fallback to feature attributes for backward compatibility
     if (imageUrls.length === 0 && feature) {
-      const images = feature.get('images')
-      // console.debug('Fallback to feature.get("images"):', images)
+      const images = feature.get('image') ?? feature.get('images') // Primary: 'image', fallback: 'images'
+      // console.debug('Fallback to feature.get("image") or feature.get("images"):', images)
       if (images && typeof images === 'string' && images.trim() !== '') {
         imageUrls = images
           .split(',')
@@ -247,8 +251,8 @@ const ImageGalleryContent = observer(function ImageGalleryContent({
     }
 
     // Get labels and types from model props first, then feature attributes as fallback
-    const imageLabels = featureImageLabels ?? feature?.get('image_labels')
-    const imageTypes = feature?.get('image_types')
+    const imageLabels = featureImageLabels ?? feature?.get('image_group')
+    const imageTypes = featureImageTypes ?? feature?.get('image_tag')
 
     if (imageUrls.length === 0) {
       return []
@@ -295,7 +299,14 @@ const ImageGalleryContent = observer(function ImageGalleryContent({
 
       return imageData
     })
-  }, [feature, featureImages, featureImageLabels, maxImages, validateUrls])
+  }, [
+    feature,
+    featureImages,
+    featureImageLabels,
+    featureImageTypes,
+    maxImages,
+    validateUrls,
+  ])
 
   const images = parseImages()
 
@@ -490,6 +501,7 @@ const ImageGalleryContent = observer(function ImageGalleryContent({
                             <Chip
                               label={image.type}
                               size="small"
+                              color="primary"
                               sx={{ mt: 0.5 }}
                             />
                           )}
@@ -555,6 +567,7 @@ const ImageGalleryView = observer(function ImageGalleryView({
       <ImageGalleryContent
         featureImages={model.featureImages}
         featureImageLabels={model.featureImageLabels}
+        featureImageTypes={model.featureImageTypes}
         config={{
           maxImages: 10,
           maxImageHeight: 200,

@@ -108,7 +108,7 @@
               }, onLoad: handleLoad, onError: handleError, onClick: () => window.open(src, '_blank') })));
   };
   // Internal ImageGallery component with all functionality
-  const ImageGalleryContent = mobxReact.observer(function ImageGalleryContent({ featureImages, featureImageLabels, feature, config, }) {
+  const ImageGalleryContent = mobxReact.observer(function ImageGalleryContent({ featureImages, featureImageLabels, featureImageTypes, feature, config, }) {
       const actualConfig = config ?? {};
       const [expandedGroups, setExpandedGroups] = React.useState(new Map());
       const [imageStates, setImageStates] = React.useState(new Map());
@@ -138,10 +138,10 @@
                       .filter((url) => url.length > 0);
               }
           }
-          // Fallback to feature.get('images') for backward compatibility
+          // Fallback to feature attributes for backward compatibility
           if (imageUrls.length === 0 && feature) {
-              const images = feature.get('images');
-              // console.debug('Fallback to feature.get("images"):', images)
+              const images = feature.get('image') ?? feature.get('images'); // Primary: 'image', fallback: 'images'
+              // console.debug('Fallback to feature.get("image") or feature.get("images"):', images)
               if (images && typeof images === 'string' && images.trim() !== '') {
                   imageUrls = images
                       .split(',')
@@ -151,8 +151,8 @@
               }
           }
           // Get labels and types from model props first, then feature attributes as fallback
-          const imageLabels = featureImageLabels ?? feature?.get('image_labels');
-          const imageTypes = feature?.get('image_types');
+          const imageLabels = featureImageLabels ?? feature?.get('image_group');
+          const imageTypes = featureImageTypes ?? feature?.get('image_tag');
           if (imageUrls.length === 0) {
               return [];
           }
@@ -194,7 +194,14 @@
               }
               return imageData;
           });
-      }, [feature, featureImages, featureImageLabels, maxImages, validateUrls]);
+      }, [
+          feature,
+          featureImages,
+          featureImageLabels,
+          featureImageTypes,
+          maxImages,
+          validateUrls,
+      ]);
       const images = parseImages();
       // Group images by their labels
       const groupImagesByLabel = React.useCallback((imageList) => {
@@ -303,7 +310,7 @@
                                   }, image: image.url, alt: image.displayName, onClick: () => window.open(image.url, '_blank'), onLoad: () => handleImageLoad(globalIndex), onError: () => handleImageError(globalIndex, 'Failed to load image') })),
                               React__default["default"].createElement(material.CardContent, { sx: { p: 1 } },
                                   React__default["default"].createElement(material.Typography, { variant: "body2", noWrap: true }, image.displayName),
-                                  image.type !== 'general' && (React__default["default"].createElement(material.Chip, { label: image.type, size: "small", sx: { mt: 0.5 } }))))));
+                                  image.type !== 'general' && (React__default["default"].createElement(material.Chip, { label: image.type, size: "small", color: "primary", sx: { mt: 0.5 } }))))));
                   })))))))));
   });
   const ImageGalleryView = mobxReact.observer(function ImageGalleryView({ model, }) {
@@ -327,7 +334,7 @@
           }, className: "MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation12 css-4h24oc-MuiPaper-root-viewContainer-unfocusedView" },
           React__default["default"].createElement(material.Box, { sx: { mb: 1 } },
               React__default["default"].createElement(material.Typography, { variant: "h6", sx: { fontSize: '1rem', fontWeight: 'bold' } }, model.displayTitle)),
-          React__default["default"].createElement(ImageGalleryContent, { featureImages: model.featureImages, featureImageLabels: model.featureImageLabels, config: {
+          React__default["default"].createElement(ImageGalleryContent, { featureImages: model.featureImages, featureImageLabels: model.featureImageLabels, featureImageTypes: model.featureImageTypes, config: {
                   maxImages: 10,
                   maxImageHeight: 200,
                   validateUrls: true,
@@ -343,22 +350,25 @@
       selectedFeatureId: mobxStateTree.types.maybe(mobxStateTree.types.string),
       featureImages: mobxStateTree.types.maybe(mobxStateTree.types.string),
       featureImageLabels: mobxStateTree.types.maybe(mobxStateTree.types.string),
+      featureImageTypes: mobxStateTree.types.maybe(mobxStateTree.types.string),
   })
       .actions(self => ({
       // unused by this view but it is updated with the current width in pixels of
       // the view panel
       setWidth() { },
       // Update the feature and images displayed in this view
-      updateFeature(featureId, images, imageLabels) {
+      updateFeature(featureId, images, imageLabels, imageTypes) {
           self.selectedFeatureId = featureId;
           self.featureImages = images;
           self.featureImageLabels = imageLabels ?? '';
+          self.featureImageTypes = imageTypes ?? '';
       },
       // Clear the current feature
       clearFeature() {
           self.selectedFeatureId = undefined;
           self.featureImages = undefined;
           self.featureImageLabels = undefined;
+          self.featureImageTypes = undefined;
       },
   }))
       .views(self => ({
@@ -416,8 +426,9 @@
                           if (f && typeof f.get === 'function') {
                               featureSummary = {
                                   id: f.get('id'),
-                                  images: f.get('images'),
-                                  image_labels: f.get('image_labels'),
+                                  images: f.get('image') || f.get('images'),
+                                  image_group: f.get('image_group'),
+                                  image_tag: f.get('image_tag'),
                               };
                           }
                           else {
@@ -441,7 +452,7 @@
                               // console.debug('Managing ImageGalleryView for feature:', {
                               //   featureId: featureSummary.id,
                               //   featureImages: featureSummary.images,
-                              //   featureImageLabels: featureSummary.image_labels,
+                              //   featureImageLabels: featureSummary.image_group,
                               //   viewId: viewId,
                               // })
                               // Check if ImageGalleryView already exists
@@ -464,16 +475,19 @@
                                   const imagesString = Array.isArray(featureSummary.images)
                                       ? featureSummary.images.join(',')
                                       : featureSummary.images;
-                                  const labelsString = Array.isArray(featureSummary.image_labels)
-                                      ? featureSummary.image_labels.join(',')
-                                      : featureSummary.image_labels;
-                                  imageGalleryView.updateFeature(featureSummary.id || 'unknown', imagesString, labelsString);
+                                  const labelsString = Array.isArray(featureSummary.image_group)
+                                      ? featureSummary.image_group.join(',')
+                                      : featureSummary.image_group;
+                                  const typesString = Array.isArray(featureSummary.image_tag)
+                                      ? featureSummary.image_tag.join(',')
+                                      : featureSummary.image_tag;
+                                  imageGalleryView.updateFeature(featureSummary.id || 'unknown', imagesString, labelsString, typesString);
                                   // eslint-disable-next-line no-console
                                   // console.debug('Updated ImageGalleryView with feature data:', {
                                   //   featureId: featureSummary.id,
                                   //   images: featureSummary.images,
                                   //   imagesString,
-                                  //   imageLabels: featureSummary.image_labels,
+                                  //   imageLabels: featureSummary.image_group,
                                   //   labelsString,
                                   // })
                               }

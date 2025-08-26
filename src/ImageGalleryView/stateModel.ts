@@ -11,6 +11,7 @@ const stateModel = types
     selectedFeatureId: types.maybe(types.string),
     featureImages: types.maybe(types.string),
     featureImageLabels: types.maybe(types.string),
+    featureImageTypes: types.maybe(types.string),
   })
   .actions(self => ({
     // unused by this view but it is updated with the current width in pixels of
@@ -18,10 +19,16 @@ const stateModel = types
     setWidth() {},
 
     // Update the feature and images displayed in this view
-    updateFeature(featureId: string, images: string, imageLabels?: string) {
+    updateFeature(
+      featureId: string,
+      images: string,
+      imageLabels?: string,
+      imageTypes?: string,
+    ) {
       self.selectedFeatureId = featureId
       self.featureImages = images
       self.featureImageLabels = imageLabels ?? ''
+      self.featureImageTypes = imageTypes ?? ''
     },
 
     // Clear the current feature
@@ -29,6 +36,7 @@ const stateModel = types
       self.selectedFeatureId = undefined
       self.featureImages = undefined
       self.featureImageLabels = undefined
+      self.featureImageTypes = undefined
     },
   }))
   .views(self => ({
