@@ -83,7 +83,7 @@ out
 # Nuxt.js build / generate output
 .nuxt
 dist/*
-!dist/jbrowse-plugin-image-gallery.cjs.production.min.js
+!dist/jbrowse-plugin-image-gallery.umd.production.min.js
 
 # Gatsby files
 .cache/
