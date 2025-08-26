@@ -16,7 +16,7 @@ export default class ImageGalleryPlugin extends Plugin {
     pluginManager.addViewType(() => {
       return new ViewType({
         name: 'HelloView',
-        stateModel: helloViewStateModel as any,
+        stateModel: helloViewStateModel,
         ReactComponent: HelloViewReactComponent,
       })
     })

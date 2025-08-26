@@ -170,33 +170,34 @@ const ImageGalleryWidget = observer(
     const validateUrls = config?.validateUrls ?? true
     const maxImages = config?.maxImages ?? 50
 
-    // Parse images from feature attributes with improved error handling
+    // Parse images from feature attributes (simple, lint-friendly)
     const parseImages = useCallback((): ImageData[] => {
       const images = feature.get('images')
       const imageLabels = feature.get('image_labels')
       const imageTypes = feature.get('image_types')
-
+      // eslint-disable-next-line no-console
+      console.debug('ImageGallery parseImages:', {
+        images,
+        imageLabels,
+        imageTypes,
+      })
       if (!images || typeof images !== 'string' || images.trim() === '') {
         return []
       }
-
       const imageUrls = images
         .split(',')
         .map((url: string) => url.trim())
         .filter((url: string) => url.length > 0)
         .slice(0, maxImages) // Limit number of images
-
       if (imageUrls.length === 0) {
         return []
       }
-
       const labels = imageLabels
         ? imageLabels.split(',').map((label: string) => label.trim())
         : []
       const types = imageTypes
         ? imageTypes.split(',').map((type: string) => type.trim())
         : []
-
       return imageUrls.map((url: string, index: number): ImageData => {
         const imageData: ImageData = {
           url,
@@ -205,7 +206,6 @@ const ImageGalleryWidget = observer(
           isLoading: true,
           hasError: false,
         }
-
         // Validate URL if validation is enabled
         if (validateUrls) {
           imageData.isValid = isValidImageUrl(url)
@@ -217,11 +217,9 @@ const ImageGalleryWidget = observer(
         } else {
           imageData.isValid = true
         }
-
         return imageData
       })
     }, [feature, maxImages, validateUrls])
-
     const images = parseImages()
 
     // Handle image loading state updates

@@ -4,6 +4,7 @@ import { configSchema } from './configSchema'
 
 const ImageGalleryWidget = lazy(() => import('./ImageGalleryWidget'))
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function ImageGalleryWidgetF(pluginManager: PluginManager): any {
   return {
     name: 'ImageGalleryWidget',
