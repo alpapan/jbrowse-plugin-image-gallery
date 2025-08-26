@@ -9,12 +9,22 @@ A JBrowse 2 plugin that displays images within feature details. Images appear au
 ### Method 1: Add Plugin via JBrowse plugin store (not yet)
 
 ### Method 2: Manual Installation
+
+Option 1:
+```bash
+wget https://github.com/alpapan/jbrowse-plugin-image-gallery/releases/download/rc-1/jbrowse-plugin-image-gallery.umd.production.min.js
+```
+
+Option 2:
+
 ```bash
 git clone https://github.com/alpapan/jbrowse-plugin-image-gallery.git
 cd jbrowse-plugin-image-gallery
 npm install
 # this works on windows too:
 npx cross-env NODE_ENV=production npm run build
+ls -l dist/jbrowse-plugin-image-gallery.umd.production.min.js
+# copy to your jb2 directory
 ```
 
 Add to your JBrowse 2 config.json:
@@ -23,7 +33,7 @@ Add to your JBrowse 2 config.json:
   "plugins": [
     {
       "name": "ImageGalleryPlugin",
-      "url": "/path/to/jbrowse-plugin-image-gallery/dist/jbrowse-plugin-image-gallery.umd.production.min.js"
+      "url": "./jbrowse-plugin-image-gallery.umd.production.min.js"
     }
   ]
 }
