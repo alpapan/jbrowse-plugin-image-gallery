@@ -80,6 +80,7 @@ export default class ImageGalleryPlugin extends Plugin {
               // console.debug('Managing ImageGalleryView for feature:', {
               //   featureId: featureSummary.id,
               //   featureImages: featureSummary.images,
+              //   featureImageLabels: featureSummary.image_labels,
               //   viewId: viewId,
               // })
 
@@ -100,16 +101,29 @@ export default class ImageGalleryPlugin extends Plugin {
                 // eslint-disable-next-line no-console
                 // console.debug('Created new ImageGalleryView:', viewId)
               }
-
               // Update the view with the current feature data
               if (imageGalleryView?.updateFeature) {
+                // Convert images array to comma-separated string if needed
+                const imagesString = Array.isArray(featureSummary.images)
+                  ? featureSummary.images.join(',')
+                  : featureSummary.images
+                const labelsString = Array.isArray(featureSummary.image_labels)
+                  ? featureSummary.image_labels.join(',')
+                  : featureSummary.image_labels
+
                 imageGalleryView.updateFeature(
                   featureSummary.id || 'unknown',
-                  featureSummary.images,
-                  featureSummary.image_labels,
+                  imagesString,
+                  labelsString,
                 )
                 // eslint-disable-next-line no-console
-                // console.debug('Updated ImageGalleryView with feature data')
+                // console.debug('Updated ImageGalleryView with feature data:', {
+                //   featureId: featureSummary.id,
+                //   images: featureSummary.images,
+                //   imagesString,
+                //   imageLabels: featureSummary.image_labels,
+                //   labelsString,
+                // })
               }
             } catch (e) {
               // eslint-disable-next-line no-console

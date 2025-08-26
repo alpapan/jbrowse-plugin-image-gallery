@@ -17,7 +17,6 @@ import {
 import ExpandMore from '@mui/icons-material/ExpandMore'
 import ExpandLess from '@mui/icons-material/ExpandLess'
 import ErrorIcon from '@mui/icons-material/Error'
-
 interface ImageData {
   url: string
   label: string
@@ -26,6 +25,14 @@ interface ImageData {
   isLoading?: boolean
   hasError?: boolean
   errorMessage?: string
+  displayName: string // URL basename for display
+}
+
+interface ImageGroup {
+  label: string
+  images: ImageData[]
+  errorCount: number
+  validCount: number
 }
 
 interface Feature {
@@ -64,6 +71,19 @@ const isValidImageUrl = (url: string): boolean => {
   // Check for common image extensions
   const imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp|svg|tiff|ico)(\?.*)?$/i
   return imageExtensions.test(url)
+}
+
+// Utility function to extract basename from URL
+const getUrlBasename = (url: string): string => {
+  try {
+    const urlObj = new URL(url)
+    const pathname = urlObj.pathname
+    const basename = pathname.split('/').pop() ?? 'image'
+    // Remove query parameters from basename
+    return basename.split('?')[0]
+  } catch {
+    return 'image'
+  }
 }
 
 // Lazy loading image component
@@ -122,22 +142,18 @@ const LazyImage: React.FC<{
 
   if (hasError) {
     return (
-      <Box
-        sx={{
-          height: maxHeight,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: 'grey.100',
-          flexDirection: 'column',
-          gap: 1,
+      <img
+        src="https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg"
+        alt="Failed to load image"
+        style={{
+          maxHeight,
+          width: '100%',
+          objectFit: 'contain',
+          backgroundColor: '#f5f5f5',
+          cursor: 'pointer',
         }}
-      >
-        <ErrorIcon color="error" />
-        <Typography variant="caption" color="error">
-          Failed to load image
-        </Typography>
-      </Box>
+        onClick={() => window.open(src, '_blank')}
+      />
     )
   }
 
@@ -172,14 +188,19 @@ const LazyImage: React.FC<{
 }
 
 // Internal ImageGallery component with all functionality
-const ImageGalleryContent: React.FC<{
+const ImageGalleryContent = observer(function ImageGalleryContent({
+  featureImages,
+  featureImageLabels,
+  feature,
+  config,
+}: {
   featureImages?: string | string[]
   featureImageLabels?: string
   feature?: Feature
   config?: ImageGalleryConfig
-}> = ({ featureImages, featureImageLabels, feature, config }) => {
+}) {
   const actualConfig = config ?? {}
-  const [expanded, setExpanded] = useState(true)
+  const [expandedGroups, setExpandedGroups] = useState<Map<string, boolean>>(new Map())
   const [imageStates, setImageStates] = useState<Map<number, ImageData>>(
     new Map(),
   )
@@ -215,16 +236,18 @@ const ImageGalleryContent: React.FC<{
     // Fallback to feature.get('images') for backward compatibility
     if (imageUrls.length === 0 && feature) {
       const images = feature.get('images')
+      // console.debug('Fallback to feature.get("images"):', images)
       if (images && typeof images === 'string' && images.trim() !== '') {
         imageUrls = images
           .split(',')
           .map((url: string) => url.trim())
           .filter((url: string) => url.length > 0)
+        // console.debug('Got images from feature fallback:', imageUrls)
       }
     }
 
     // Get labels and types from model props first, then feature attributes as fallback
-    const imageLabels = featureImageLabels || feature?.get('image_labels')
+    const imageLabels = featureImageLabels ?? feature?.get('image_labels')
     const imageTypes = feature?.get('image_types')
 
     if (imageUrls.length === 0) {
@@ -241,6 +264,14 @@ const ImageGalleryContent: React.FC<{
       ? imageTypes.split(',').map((type: string) => type.trim())
       : []
 
+    // console.debug('Final parsing:', {
+    //   limitedUrls,
+    //   labels,
+    //   types,
+    //   imageLabels,
+    //   imageTypes,
+    // })
+
     return limitedUrls.map((url: string, index: number): ImageData => {
       const imageData: ImageData = {
         url,
@@ -248,6 +279,7 @@ const ImageGalleryContent: React.FC<{
         type: types[index] || 'general',
         isLoading: true,
         hasError: false,
+        displayName: getUrlBasename(url),
       }
       // Validate URL if validation is enabled
       if (validateUrls) {
@@ -263,9 +295,52 @@ const ImageGalleryContent: React.FC<{
 
       return imageData
     })
-  }, [feature, featureImages, maxImages, validateUrls])
+  }, [feature, featureImages, featureImageLabels, maxImages, validateUrls])
 
   const images = parseImages()
+
+  // Group images by their labels
+  const groupImagesByLabel = useCallback(
+    (imageList: ImageData[]): ImageGroup[] => {
+      const groups = new Map<string, ImageData[]>()
+
+      imageList.forEach(image => {
+        const label = image.label
+        if (!groups.has(label)) {
+          groups.set(label, [])
+        }
+        groups.get(label)!.push(image)
+      })
+
+      return Array.from(groups.entries()).map(([label, groupImages]) => {
+        const errorCount = groupImages.filter(img => img.hasError).length
+        const validCount = groupImages.length - errorCount
+        return {
+          label,
+          images: groupImages,
+          errorCount,
+          validCount,
+        }
+      })
+    },
+    [],
+  )
+
+  const imageGroups = groupImagesByLabel(images)
+
+  // Helper function to get expanded state for a group
+  const isGroupExpanded = (groupLabel: string): boolean => {
+    return expandedGroups.get(groupLabel) ?? true // Default to expanded
+  }
+
+  // Helper function to toggle expanded state for a group
+  const toggleGroupExpanded = (groupLabel: string) => {
+    setExpandedGroups(prev => {
+      const newMap = new Map(prev)
+      newMap.set(groupLabel, !isGroupExpanded(groupLabel))
+      return newMap
+    })
+  }
 
   // Handle image loading state updates
   const handleImageLoad = useCallback(
@@ -311,121 +386,126 @@ const ImageGalleryContent: React.FC<{
     )
   }
 
-  const validImages = images.filter(img => !img.hasError)
-  const errorCount = images.length - validImages.length
-
   return (
-    <Box sx={{ mt: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          p: 1,
-          bgcolor: 'grey.50',
-          cursor: 'pointer',
-        }}
-        onClick={() => setExpanded(!expanded)}
-      >
-        <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
-          Images ({images.length})
-          {errorCount > 0 && (
-            <Chip
-              label={`${errorCount} failed`}
-              size="small"
-              color="error"
-              sx={{ ml: 1 }}
-            />
-          )}
-        </Typography>
-        <IconButton size="small">
-          {expanded ? <ExpandLess /> : <ExpandMore />}
-        </IconButton>
-      </Box>
+    <Box sx={{ mt: 2 }}>
+      {imageGroups.map((group: ImageGroup, groupIndex: number) => (
+        <Box
+          key={groupIndex}
+          sx={{ mb: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              p: 1,
+              bgcolor: 'grey.50',
+              cursor: 'pointer',
+            }}
+            onClick={() => toggleGroupExpanded(group.label)}
+          >
+            <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
+              {group.label} ({group.images.length})
+              {group.errorCount > 0 && (
+                <Chip
+                  label={`${group.errorCount} failed`}
+                  size="small"
+                  color="error"
+                  sx={{ ml: 1 }}
+                />
+              )}
+            </Typography>
+            <IconButton size="small">
+              {isGroupExpanded(group.label) ? <ExpandLess /> : <ExpandMore />}
+            </IconButton>
+          </Box>
 
-      <Collapse in={expanded}>
-        <Box sx={{ p: 2 }}>
-          {errorCount > 0 && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              {errorCount} image{errorCount > 1 ? 's' : ''} failed to load.
-              Check the URLs and try again.
-            </Alert>
-          )}
-          <Grid container spacing={2}>
-            {images.map((image: ImageData, index: number) => {
-              const currentState = imageStates.get(index) ?? image
+          <Collapse in={isGroupExpanded(group.label)}>
+            <Box sx={{ p: 2 }}>
+              {group.errorCount > 0 && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  {group.errorCount} image{group.errorCount > 1 ? 's' : ''}{' '}
+                  failed to load. Check the URLs and try again.
+                </Alert>
+              )}
+              <Grid container spacing={2}>
+                {group.images.map((image: ImageData, imageIndex: number) => {
+                  // Calculate global index for state management
+                  const globalIndex = images.findIndex(
+                    img => img.url === image.url,
+                  )
+                  const currentState = imageStates.get(globalIndex) ?? image
 
-              return (
-                <Grid size={{ xs: 12, sm: 6 }} key={index}>
-                  <Card sx={{ maxWidth: maxWidth }}>
-                    {currentState.hasError ? (
-                      <Box
-                        sx={{
-                          height: maxHeight,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          bgcolor: 'grey.100',
-                          flexDirection: 'column',
-                          gap: 1,
-                        }}
-                      >
-                        <ErrorIcon color="error" />
-                        <Typography
-                          variant="caption"
-                          color="error"
-                          align="center"
-                        >
-                          {currentState.errorMessage ?? 'Failed to load image'}
-                        </Typography>
-                      </Box>
-                    ) : enableLazyLoading ? (
-                      <LazyImage
-                        src={image.url}
-                        alt={image.label}
-                        maxHeight={maxHeight}
-                        onLoad={() => handleImageLoad(index)}
-                        onError={error => handleImageError(index, error)}
-                      />
-                    ) : (
-                      <CardMedia
-                        component="img"
-                        sx={{
-                          maxHeight: maxHeight,
-                          objectFit: 'contain',
-                          bgcolor: 'grey.100',
-                          cursor: 'pointer',
-                        }}
-                        image={image.url}
-                        alt={image.label}
-                        onClick={() => window.open(image.url, '_blank')}
-                        onLoad={() => handleImageLoad(index)}
-                        onError={() =>
-                          handleImageError(index, 'Failed to load image')
-                        }
-                      />
-                    )}
-                    <CardContent sx={{ p: 1 }}>
-                      <Typography variant="body2" noWrap>
-                        {image.label}
-                      </Typography>
-                      {image.type !== 'general' && (
-                        <Chip
-                          label={image.type}
-                          size="small"
-                          sx={{ mt: 0.5 }}
-                        />
-                      )}
-                    </CardContent>
-                  </Card>
-                </Grid>
-              )
-            })}
-          </Grid>
+                  return (
+                    <Grid size={{ xs: 12, sm: 6 }} key={imageIndex}>
+                      <Card sx={{ maxWidth: maxWidth }}>
+                        {currentState.hasError ? (
+                          <img
+                            src="https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg"
+                            alt="Failed to load image"
+                            style={{
+                              maxHeight,
+                              width: '100%',
+                              objectFit: 'contain',
+                              backgroundColor: '#f5f5f5',
+                              cursor: 'pointer',
+                            }}
+                            onClick={() => window.open(image.url, '_blank')}
+                          />
+                        ) : enableLazyLoading ? (
+                          <LazyImage
+                            src={image.url}
+                            alt={image.displayName}
+                            maxHeight={maxHeight}
+                            onLoad={() => handleImageLoad(globalIndex)}
+                            onError={error =>
+                              handleImageError(globalIndex, error)
+                            }
+                          />
+                        ) : (
+                          <CardMedia
+                            component="img"
+                            sx={{
+                              maxHeight: maxHeight,
+                              objectFit: 'contain',
+                              bgcolor: 'grey.100',
+                              cursor: 'pointer',
+                            }}
+                            image={image.url}
+                            alt={image.displayName}
+                            onClick={() => window.open(image.url, '_blank')}
+                            onLoad={() => handleImageLoad(globalIndex)}
+                            onError={() =>
+                              handleImageError(
+                                globalIndex,
+                                'Failed to load image',
+                              )
+                            }
+                          />
+                        )}
+                        <CardContent sx={{ p: 1 }}>
+                          <Typography variant="body2" noWrap>
+                            {image.displayName}
+                          </Typography>
+                          {image.type !== 'general' && (
+                            <Chip
+                              label={image.type}
+                              size="small"
+                              sx={{ mt: 0.5 }}
+                            />
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  )
+                })}
+              </Grid>
+            </Box>
+          </Collapse>
         </Box>
-      </Collapse>
+      ))}
     </Box>
   )
-}
+})
 
 const ImageGalleryView = observer(function ImageGalleryView({
   model,
@@ -446,10 +526,10 @@ const ImageGalleryView = observer(function ImageGalleryView({
         className="MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation12 css-4h24oc-MuiPaper-root-viewContainer-unfocusedView"
       >
         <Typography variant="h6" color="textSecondary">
-          No Feature Selected
+          No feature with images selected
         </Typography>
         <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-          Select a feature with images to view them here
+          When you select a feature with images, they will appear here
         </Typography>
       </Paper>
     )
@@ -474,6 +554,7 @@ const ImageGalleryView = observer(function ImageGalleryView({
       {/* Use the merged ImageGalleryContent component */}
       <ImageGalleryContent
         featureImages={model.featureImages}
+        featureImageLabels={model.featureImageLabels}
         config={{
           maxImages: 10,
           maxImageHeight: 200,
