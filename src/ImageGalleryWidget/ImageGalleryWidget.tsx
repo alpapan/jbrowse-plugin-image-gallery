@@ -39,9 +39,19 @@ interface ImageGalleryConfig {
   maxImages?: number
 }
 
+interface ImageGalleryWidgetModel {
+  id: string
+  type: string
+  feature?: Feature
+  featureImages?: string | string[]
+}
+
 interface ImageGalleryWidgetProps {
-  feature: Feature
+  // Support both model-based (widget) and direct props (component) usage
+  model?: ImageGalleryWidgetModel
+  feature?: Feature
   config?: ImageGalleryConfig
+  featureImages?: string | string[]
 }
 
 // Utility function to validate if a URL is likely an image
@@ -159,18 +169,22 @@ const LazyImage: React.FC<{
 }
 
 const ImageGalleryWidget = observer(
-  ({ feature, config }: ImageGalleryWidgetProps) => {
+  ({ model, feature, config, featureImages }: ImageGalleryWidgetProps) => {
+    // Support both model-based and direct props usage
+    const actualFeature = model?.feature || feature
+    const actualFeatureImages = model?.featureImages || featureImages
+    const actualConfig = config || {}
     const [expanded, setExpanded] = useState(true)
     const [imageStates, setImageStates] = useState<Map<number, ImageData>>(
       new Map(),
     )
 
     // Configuration with better defaults
-    const maxWidth = config?.maxImageWidth ?? 300
-    const maxHeight = config?.maxImageHeight ?? 200
-    const enableLazyLoading = config?.enableLazyLoading ?? true
-    const validateUrls = config?.validateUrls ?? true
-    const maxImages = config?.maxImages ?? 50
+    const maxWidth = actualConfig?.maxImageWidth ?? 300
+    const maxHeight = actualConfig?.maxImageHeight ?? 200
+    const enableLazyLoading = actualConfig?.enableLazyLoading ?? true
+    const validateUrls = actualConfig?.validateUrls ?? true
+    const maxImages = actualConfig?.maxImages ?? 50
 
     // Log whenever the widget mounts or the feature prop changes so we can trace
     // why the widget may not be rendering for selected features.
@@ -178,48 +192,74 @@ const ImageGalleryWidget = observer(
       // eslint-disable-next-line no-console
       console.debug('ImageGalleryWidget mounted/updated', {
         featureSummary: {
-          images: feature?.get('images'),
-          image_labels: feature?.get('image_labels'),
-          image_types: feature?.get('image_types'),
+          images: actualFeature?.get('images'),
+          image_labels: actualFeature?.get('image_labels'),
+          image_types: actualFeature?.get('image_types'),
         },
-        featureObject: feature,
+        featureObject: actualFeature,
       })
-    }, [feature])
+    }, [actualFeature])
 
     // Parse images from feature attributes (simple, lint-friendly)
     const parseImages = useCallback((): ImageData[] => {
-      // Check if feature is defined before calling .get()
-      if (!feature) {
-        return []
+      // First try to use featureImages prop as primary source
+      let imageUrls: string[] = []
+      
+      if (actualFeatureImages) {
+        if (typeof actualFeatureImages === 'string') {
+          // Handle single string - could be single URL or comma-separated URLs
+          imageUrls = actualFeatureImages
+            .split(',')
+            .map((url: string) => url.trim())
+            .filter((url: string) => url.length > 0)
+        } else if (Array.isArray(actualFeatureImages)) {
+          // Handle array of URLs
+          imageUrls = actualFeatureImages
+            .filter((url: string) => url && typeof url === 'string')
+            .map((url: string) => url.trim())
+            .filter((url: string) => url.length > 0)
+        }
       }
       
-      const images = feature.get('images')
-      const imageLabels = feature.get('image_labels')
-      const imageTypes = feature.get('image_types')
+      // Fallback to feature.get('images') for backward compatibility
+      if (imageUrls.length === 0 && actualFeature) {
+        const images = actualFeature.get('images')
+        if (images && typeof images === 'string' && images.trim() !== '') {
+          imageUrls = images
+            .split(',')
+            .map((url: string) => url.trim())
+            .filter((url: string) => url.length > 0)
+        }
+      }
+
+      // Get labels and types from feature attributes (fallback data)
+      const imageLabels = actualFeature?.get('image_labels')
+      const imageTypes = actualFeature?.get('image_types')
+      
       // eslint-disable-next-line no-console
       console.debug('ImageGallery parseImages:', {
-        images,
+        featureImages: actualFeatureImages,
+        fallbackImages: actualFeature?.get('images'),
         imageLabels,
         imageTypes,
+        finalImageUrls: imageUrls,
       })
-      if (!images || typeof images !== 'string' || images.trim() === '') {
-        return []
-      }
-      const imageUrls = images
-        .split(',')
-        .map((url: string) => url.trim())
-        .filter((url: string) => url.length > 0)
-        .slice(0, maxImages) // Limit number of images
+
       if (imageUrls.length === 0) {
         return []
       }
+
+      // Limit number of images
+      const limitedUrls = imageUrls.slice(0, maxImages)
+      
       const labels = imageLabels
         ? imageLabels.split(',').map((label: string) => label.trim())
         : []
       const types = imageTypes
         ? imageTypes.split(',').map((type: string) => type.trim())
         : []
-      return imageUrls.map((url: string, index: number): ImageData => {
+
+      return limitedUrls.map((url: string, index: number): ImageData => {
         const imageData: ImageData = {
           url,
           label: labels[index] || `Image ${index + 1}`,
@@ -240,7 +280,7 @@ const ImageGalleryWidget = observer(
         }
         return imageData
       })
-    }, [feature, maxImages, validateUrls])
+    }, [actualFeature, actualFeatureImages, maxImages, validateUrls])
     const images = parseImages()
 
     // Handle image loading state updates

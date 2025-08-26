@@ -172,8 +172,11 @@ try {
             availableWidgetTypes: Object.keys(pluginManager.widgetTypes),
           })
           
-          // Match ICGC pattern exactly: simple ID, no extra params
-          session.showWidget(session.addWidget(widgetTypeName, simpleWidgetId))
+          // Pass featureImages and other props to the widget
+          session.showWidget(session.addWidget(widgetTypeName, simpleWidgetId, {
+            featureImages: featureSummary.images,
+            feature: selectedFeature
+          }))
         } catch (e) {
           // eslint-disable-next-line no-console
           console.debug('Error opening ImageGallery widget:', e)
