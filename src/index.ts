@@ -8,15 +8,15 @@ import {
   stateModel as helloViewStateModel,
 } from './HelloView'
 
-export default class TemplatePlugin extends Plugin {
-  name = 'TemplatePlugin'
+export default class ImageGalleryPlugin extends Plugin {
+  name = 'ImageGalleryPlugin'
   version = version
 
   install(pluginManager: PluginManager) {
     pluginManager.addViewType(() => {
       return new ViewType({
         name: 'HelloView',
-        stateModel: helloViewStateModel,
+        stateModel: helloViewStateModel as any,
         ReactComponent: HelloViewReactComponent,
       })
     })

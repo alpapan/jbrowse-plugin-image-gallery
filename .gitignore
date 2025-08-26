@@ -124,3 +124,7 @@ cypress/screenshots
 
 # Ignore code editor
 .vscode
+jbrowse_image.code-workspace
+config - Copy.json
+jbrowse_config - Copy.json
+package-lock.json

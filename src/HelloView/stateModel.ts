@@ -4,7 +4,7 @@ import { types } from 'mobx-state-tree'
 
 const stateModel = types
   .model({
-    id: ElementId,
+    id: ElementId as any,
     type: types.literal('HelloView'),
   })
   .actions(() => ({
