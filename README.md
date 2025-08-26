@@ -6,16 +6,17 @@ A JBrowse 2 plugin that displays images within feature details. Images appear au
 
 ### Method 1: Add Plugin via JBrowse CLI
 ```bash
-jbrowse add-plugin https://github.com/your-repo/jbrowse-plugin-image-gallery.git
+jbrowse add-plugin https://github.com/alpapan/jbrowse-plugin-image-gallery.git
 ```
 
 ### Method 2: Manual Installation
 ```bash
-git clone https://github.com/your-repo/jbrowse-plugin-image-gallery.git
+git clone https://github.com/alpapan/jbrowse-plugin-image-gallery.git
 cd jbrowse-plugin-image-gallery
 npm install
-npm run build
-jbrowse add-plugin /path/to/jbrowse-plugin-image-gallery
+# this works on windows too:
+npx cross-env NODE_ENV=production npm run build
+jbrowse add-plugin .
 ```
 
 ### Method 3: Configuration File
@@ -31,9 +32,8 @@ Add to your JBrowse 2 config.json:
 }
 ```
 
-## JBrowse Configuration
+## Example Configuration
 
-Complete configuration example:
 
 ```json
 {
@@ -76,8 +76,7 @@ Complete configuration example:
 ## Creating GFF Files
 
 ### Required Attributes
-- `image`: Comma-separated list of image URLs (recommended)
-- `images`: Comma-separated list of image URLs (legacy fallback)
+- `image` or `images`: Comma-separated list of image URLs (use one or the other)
 
 ### Optional Attributes
 - `image_group`: Comma-separated labels for each image (used as container titles)
