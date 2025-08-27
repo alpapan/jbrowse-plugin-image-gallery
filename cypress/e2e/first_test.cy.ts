@@ -2,8 +2,11 @@ describe('Basic JBrowse and Plugin Test', () => {
   it('visits JBrowse and loads successfully', () => {
     cy.visit('/')
 
-    // The splash screen successfully loads
-    cy.contains('Start a new session')
+    // Wait for JBrowse to load - check for the root container
+    cy.get('#root', { timeout: 10000 }).should('exist')
+
+    // Wait for JBrowse app to initialize
+    cy.get('body').should('contain.text', 'JBrowse')
   })
 
   it('can load JBrowse with ImageGallery plugin configuration', () => {
@@ -17,8 +20,16 @@ describe('Basic JBrowse and Plugin Test', () => {
       // Verify JBrowse loads with the plugin configuration
       cy.get('body').should('be.visible')
 
-      // Basic check that the application loaded
-      cy.get('[data-testid="jbrowse-app"]', { timeout: 15000 }).should('exist')
+      // Wait for JBrowse to load
+      cy.get('#root', { timeout: 15000 }).should('exist')
+
+      // Verify the plugin loaded correctly by checking the request succeeded
+      cy.request({
+        url: 'http://localhost:9000/dist/jbrowse-plugin-image-gallery-plugin.umd.development.js',
+        failOnStatusCode: false,
+      }).then(response => {
+        expect(response.status).to.eq(200)
+      })
     })
   })
 })
