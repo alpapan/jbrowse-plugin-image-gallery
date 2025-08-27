@@ -42,15 +42,15 @@
   ],
   "plugins": [
     {
-      "name": "ImageGallery",
-      "url": "http://localhost:9000/dist/jbrowse-plugin-image-gallery.umd.development.js"
+      "name": "ImageGalleryPlugin",
+      "url": "http://localhost:9000/dist/jbrowse-plugin-image-gallery-plugin.umd.development.js"
     }
   ],
   "defaultSession": {
     "name": "New session",
     "views": [
       {
-        "type": "HelloView"
+        "type": "ImageGalleryView"
       }
     ]
   }
