@@ -5,8 +5,8 @@ describe('Basic JBrowse and Plugin Test', () => {
     // Wait for JBrowse to load - check for the root container
     cy.get('#root', { timeout: 10000 }).should('exist')
 
-    // Wait for JBrowse app to initialize
-    cy.get('body').should('contain.text', 'JBrowse')
+    // Wait for JBrowse app to initialize - look for text that actually appears
+    cy.get('body').should('contain.text', 'New Session')
   })
 
   it('can load JBrowse with ImageGallery plugin configuration', () => {

@@ -52,7 +52,7 @@
       "port": 8999
     },
     "jbrowse": {
-      "plugin": {        
+      "plugin": {
         "name": "ImageGallery"
       }
     }
@@ -67,7 +67,7 @@
     "@schemastore/package": "^0.0.10",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^15.0.0",
-    "@types/jest": "^29.5.11",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.10.5",
     "@types/react": "^18.2.45",
     "@types/react-syntax-highlighter": "^15.5.7",
@@ -76,7 +76,7 @@
     "chalk": "^4.0.0",
     "cross-env": "^7.0.3",
     "cross-var": "^1.1.0",
-    "cypress": "^13.6.1",
+    "cypress": "^15.0.0",
     "eslint": "^8.36.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-jsx-a11y": "^6.3.1",
