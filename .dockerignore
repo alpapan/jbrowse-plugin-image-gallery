@@ -1,0 +1,17 @@
+node_modules
+.git
+.gitignore
+README.md
+.env
+.env.local
+.env.production.local
+.env.test.local
+.nyc_output
+coverage
+.npm
+.eslintcache
+.jbrowse
+cypress/videos
+cypress/screenshots
+dist
+*.log

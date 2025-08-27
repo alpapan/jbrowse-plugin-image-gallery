@@ -36,8 +36,11 @@
     "jbrowse:serve": "cross-var serve --listen $npm_package_config_browse_port .jbrowse",
     "test": "jest",
     "test:e2e": "cross-var start-test \"npm-run-all --parallel start browse\" \"$npm_package_config_port|$npm_package_config_browse_port\" \"npm-run-all cypress:run\"",
+    "test:e2e:docker": "npm-run-all --parallel start browse \"cypress:docker\"",
     "cypress:run": "cross-var cypress run --headless --browser chrome --config baseUrl=http://localhost:$npm_package_config_browse_port",
     "cypress:open": "cross-var cypress open --config baseUrl=http://localhost:$npm_package_config_browse_port",
+    "cypress:docker": "docker-compose -f docker-compose.cypress.yml up --build --abort-on-container-exit",
+    "cypress:docker:build": "docker build -f Dockerfile.cypress -t jbrowse-plugin-cypress .",
     "lint": "eslint --ext .js,.ts,.jsx,.tsx src/",
     "prepublishOnly": "npm-run-all test",
     "prepack": "npm-run-all build",
@@ -49,7 +52,7 @@
       "port": 8999
     },
     "jbrowse": {
-      "plugin": {
+      "plugin": {        
         "name": "ImageGallery"
       }
     }

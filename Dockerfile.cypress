@@ -1,0 +1,22 @@
+FROM cypress/included:13.6.1
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code and tests
+COPY . .
+
+# Ensure the plugin is built
+RUN npm run build
+
+# Set display for headless mode
+ENV DISPLAY=:99
+
+# Default command to run Cypress tests
+CMD ["npm", "run", "cypress:run"]

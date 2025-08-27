@@ -1,0 +1,18 @@
+
+services:
+  cypress:
+    build: 
+      context: .
+      dockerfile: Dockerfile.cypress
+    environment:
+      - CYPRESS_baseUrl=http://host.docker.internal:8999
+    volumes:
+      - ./cypress/videos:/app/cypress/videos
+      - ./cypress/screenshots:/app/cypress/screenshots
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      sh -c "
+        echo 'Starting Cypress tests...' &&
+        npm run cypress:run
+      "
