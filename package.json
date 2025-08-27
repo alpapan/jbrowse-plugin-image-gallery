@@ -67,6 +67,7 @@
     "@types/jest": "^29.5.11",
     "@types/node": "^20.10.5",
     "@types/react": "^18.2.45",
+    "@types/react-syntax-highlighter": "^15.5.7",
     "@typescript-eslint/eslint-plugin": "^7.12.0",
     "@typescript-eslint/parser": "^7.12.0",
     "chalk": "^4.0.0",
@@ -106,9 +107,13 @@
   "dependencies": {
     "@mui/icons-material": "^7.3.1",
     "@mui/material": "^7.3.1",
+    "cytoscape": "^3.33.1",
     "mobx": "^6.13.7",
     "mobx-react": "^9.2.0",
     "mobx-state-tree": "^7.0.2",
+    "react-markdown": "^9.0.1",
+    "react-syntax-highlighter": "^15.5.0",
+    "remark-gfm": "^4.0.0",
     "rollup": "^2.79.2"
   }
 }

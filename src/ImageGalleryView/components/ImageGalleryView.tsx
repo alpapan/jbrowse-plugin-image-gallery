@@ -14,8 +14,32 @@ import {
   Alert,
   Skeleton,
 } from '@mui/material'
-import ExpandMore from '@mui/icons-material/ExpandMore'
-import ExpandLess from '@mui/icons-material/ExpandLess'
+
+// Simple expand/collapse icon components to replace Material-UI icons
+const ExpandMore: React.FC = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    style={{ transition: 'transform 0.2s' }}
+  >
+    <path d="M7 10l5 5 5-5z" />
+  </svg>
+)
+
+const ExpandLess: React.FC = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    style={{ transition: 'transform 0.2s' }}
+  >
+    <path d="M7 14l5-5 5 5z" />
+  </svg>
+)
+
 interface ImageData {
   url: string
   label: string
