@@ -4,7 +4,8 @@
       "name": "ImageGalleryPlugin",
       "url": "http://localhost:9000/dist/jbrowse-plugin-image-gallery-plugin.umd.development.js"
     }
-  ],"assemblies": [
+  ],
+  "assemblies": [
     {
       "name": "hg19",
       "displayName": "Homo sapiens (hg19)",

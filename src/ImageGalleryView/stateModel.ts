@@ -2,6 +2,32 @@ import { MenuItem } from '@jbrowse/core/ui'
 import { ElementId } from '@jbrowse/core/util/types/mst'
 import { types } from 'mobx-state-tree'
 
+enum FeatureType {
+  GENE = 'GENE',
+  NON_GENE = 'NON_GENE',
+}
+
+export class ImageGalleryState {
+  selectedFeatureId?: string
+  selectedFeatureType: FeatureType = FeatureType.NON_GENE
+  featureImages = ''
+  featureImageLabels = ''
+  featureImageTypes = ''
+
+  // Add deduplicateImages method
+  deduplicateImages(images: string[]): string[] {
+    const imageMap: Record<string, string> = {}
+
+    // Only deduplicate by URL, not by type
+    for (const image of images) {
+      if (image && !imageMap[image]) {
+        imageMap[image] = image
+      }
+    }
+    return Object.keys(imageMap)
+  }
+}
+
 const stateModel = types
   .model({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -11,6 +37,7 @@ const stateModel = types
     minimized: types.optional(types.boolean, false),
     // Store the selected feature and images for this view
     selectedFeatureId: types.maybe(types.string),
+    selectedFeatureType: types.optional(types.string, 'GENE'),
     featureImages: types.maybe(types.string),
     featureImageLabels: types.maybe(types.string),
     featureImageTypes: types.maybe(types.string),
@@ -47,19 +74,51 @@ const stateModel = types
     // Update the feature and images displayed in this view
     updateFeature(
       featureId: string,
+      featureType: FeatureType,
       images: string,
       imageLabels?: string,
       imageTypes?: string,
     ) {
+      // Validate input
+      if (!featureId || !images) {
+        console.error('Invalid feature data')
+        return
+      }
+
+      // Parse comma-separated strings from GFF3 attributes (not JSON)
+      const imageList = images
+        ? images
+            .split(',')
+            .map(url => url.trim())
+            .filter(url => url.length > 0)
+        : []
+      const labelList = imageLabels
+        ? imageLabels
+            .split(',')
+            .map(label => label.trim())
+            .filter(label => label.length > 0)
+        : []
+      const typeList = imageTypes
+        ? imageTypes
+            .split(',')
+            .map(type => type.trim())
+            .filter(type => type.length > 0)
+        : []
+
+      // Deduplicate images using the class method
+      const uniqueImages = new ImageGalleryState().deduplicateImages(imageList)
+
       self.selectedFeatureId = featureId
-      self.featureImages = images
-      self.featureImageLabels = imageLabels ?? ''
-      self.featureImageTypes = imageTypes ?? ''
+      self.selectedFeatureType = featureType.toString()
+      self.featureImages = uniqueImages.join(',')
+      self.featureImageLabels = labelList.join(',')
+      self.featureImageTypes = typeList.join(',')
     },
 
     // Clear the current feature
     clearFeature() {
       self.selectedFeatureId = undefined
+      self.selectedFeatureType = 'GENE'
       self.featureImages = undefined
       self.featureImageLabels = undefined
       self.featureImageTypes = undefined
@@ -84,3 +143,4 @@ const stateModel = types
   }))
 
 export default stateModel
+export { FeatureType }

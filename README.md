@@ -131,13 +131,13 @@ Select any feature with image data. The ImageGalleryView appears automatically.
 
 ## Configuration Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `maxImages` | 50 | Maximum images to display |
-| `maxImageHeight` | 200 | Maximum image height (px) |
-| `maxImageWidth` | 300 | Maximum image width (px) |
-| `enableLazyLoading` | true | Use intersection observer |
-| `validateUrls` | true | Validate image URL formats |
+| Option              | Default | Description                |
+| ------------------- | ------- | -------------------------- |
+| `maxImages`         | 50      | Maximum images to display  |
+| `maxImageHeight`    | 200     | Maximum image height (px)  |
+| `maxImageWidth`     | 300     | Maximum image width (px)   |
+| `enableLazyLoading` | true    | Use intersection observer  |
+| `validateUrls`      | true    | Validate image URL formats |
 
 ## Technical Architecture
 
