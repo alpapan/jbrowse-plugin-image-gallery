@@ -262,15 +262,13 @@ const ImageGalleryContent = observer(function ImageGalleryContent({
     }
 
     // Fallback to feature attributes for backward compatibility
-    if (imageUrls.length === 0 && feature) {
+    if (feature) {
       const images = feature.get('image') ?? feature.get('images') // Primary: 'image', fallback: 'images'
-      // console.debug('Fallback to feature.get("image") or feature.get("images"):', images)
       if (images && typeof images === 'string' && images.trim() !== '') {
         imageUrls = images
           .split(',')
           .map((url: string) => url.trim())
           .filter((url: string) => url.length > 0)
-        // console.debug('Got images from feature fallback:', imageUrls)
       }
     }
 

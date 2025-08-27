@@ -11,8 +11,8 @@ export class ImageGalleryState {
   selectedFeatureId?: string
   selectedFeatureType: FeatureType = FeatureType.NON_GENE
   featureImages = ''
-  featureImageLabels = ''
-  featureImageTypes = ''
+  featureLabels = ''
+  featureTypes = ''
 
   // Add deduplicateImages method
   deduplicateImages(images: string[]): string[] {
@@ -33,14 +33,14 @@ const stateModel = types
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     id: ElementId as any,
     type: types.literal('ImageGalleryView'),
-    displayName: types.optional(types.string, 'Images'),
+    displayName: types.optional(types.string, 'Image Gallery'),
     minimized: types.optional(types.boolean, false),
     // Store the selected feature and images for this view
     selectedFeatureId: types.maybe(types.string),
     selectedFeatureType: types.optional(types.string, 'GENE'),
     featureImages: types.maybe(types.string),
-    featureImageLabels: types.maybe(types.string),
-    featureImageTypes: types.maybe(types.string),
+    featureLabels: types.maybe(types.string),
+    featureTypes: types.maybe(types.string),
   })
   .actions(self => ({
     // unused by this view but it is updated with the current width in pixels of
@@ -76,12 +76,11 @@ const stateModel = types
       featureId: string,
       featureType: FeatureType,
       images: string,
-      imageLabels?: string,
-      imageTypes?: string,
+      labels?: string,
+      types?: string,
     ) {
       // Validate input
       if (!featureId || !images) {
-        console.error('Invalid feature data')
         return
       }
 
@@ -92,14 +91,14 @@ const stateModel = types
             .map(url => url.trim())
             .filter(url => url.length > 0)
         : []
-      const labelList = imageLabels
-        ? imageLabels
+      const labelList = labels
+        ? labels
             .split(',')
             .map(label => label.trim())
             .filter(label => label.length > 0)
         : []
-      const typeList = imageTypes
-        ? imageTypes
+      const typeList = types
+        ? types
             .split(',')
             .map(type => type.trim())
             .filter(type => type.length > 0)
@@ -111,8 +110,8 @@ const stateModel = types
       self.selectedFeatureId = featureId
       self.selectedFeatureType = featureType.toString()
       self.featureImages = uniqueImages.join(',')
-      self.featureImageLabels = labelList.join(',')
-      self.featureImageTypes = typeList.join(',')
+      self.featureLabels = labelList.join(',')
+      self.featureTypes = typeList.join(',')
     },
 
     // Clear the current feature
@@ -120,8 +119,8 @@ const stateModel = types
       self.selectedFeatureId = undefined
       self.selectedFeatureType = 'GENE'
       self.featureImages = undefined
-      self.featureImageLabels = undefined
-      self.featureImageTypes = undefined
+      self.featureLabels = undefined
+      self.featureTypes = undefined
     },
   }))
   .views(self => ({
@@ -131,7 +130,7 @@ const stateModel = types
     },
 
     // Computed properties for easy access
-    get hasImages() {
+    get hasContent() {
       return !!(self.featureImages && self.featureImages.trim() !== '')
     },
 

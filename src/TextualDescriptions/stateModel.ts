@@ -81,7 +81,6 @@ const stateModel = types
     ) {
       // Validate input
       if (!featureId || !markdownUrls) {
-        console.error('Invalid feature data')
         return
       }
 

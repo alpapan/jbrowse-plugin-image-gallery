@@ -53,9 +53,6 @@ const CytoscapeDirectRender: React.FC<{ data: CytoscapeData }> = ({ data }) => {
   const [info, setInfo] = useState<string>('Loading cytoscape...')
 
   useEffect(() => {
-    console.log('CytoscapeDirectRender useEffect called')
-    console.log('Container ref current:', containerRef.current)
-
     if (containerRef.current) {
       const container = containerRef.current
       setInfo('Container available, initializing cytoscape...')
@@ -65,7 +62,6 @@ const CytoscapeDirectRender: React.FC<{ data: CytoscapeData }> = ({ data }) => {
 
       import('cytoscape')
         .then(cytoscape => {
-          console.log('Cytoscape imported successfully')
           const elements = data.elements ?? []
           const style = data.style ?? []
 
@@ -73,8 +69,6 @@ const CytoscapeDirectRender: React.FC<{ data: CytoscapeData }> = ({ data }) => {
             setInfo('No elements to render')
             return
           }
-
-          console.log('Creating cytoscape instance with elements:', elements.length)
 
           const cy = cytoscape.default({
             container,
@@ -117,11 +111,11 @@ const CytoscapeDirectRender: React.FC<{ data: CytoscapeData }> = ({ data }) => {
             boxSelectionEnabled: false,
           })
 
-          console.log('Cytoscape instance created:', cy)
-          setInfo(`Cytoscape rendered successfully! (${elements.length} elements)`)
+          setInfo(
+            `Cytoscape rendered successfully! (${elements.length} elements)`,
+          )
         })
         .catch(err => {
-          console.error('Cytoscape error:', err)
           setInfo(`Cytoscape error: ${err.message}`)
         })
     } else {
@@ -158,9 +152,6 @@ const CytoscapeDiagram: React.FC<{ chart: string }> = ({ chart }) => {
   const [info, setInfo] = useState<string>('Initializing...')
 
   useEffect(() => {
-    console.log('CytoscapeDiagram useEffect called')
-    console.log('Container ref current:', containerRef.current)
-
     if (containerRef.current) {
       setInfo('Container available!')
       containerRef.current.innerHTML = `
@@ -315,7 +306,6 @@ const TextualDescriptions: React.FC<TextualDescriptionsProps> = observer(
           const combinedContent = responses.join('\n\n---\n\n')
           setContent(combinedContent)
         } catch (err) {
-          console.error('Error fetching markdown content:', err)
           setError(err instanceof Error ? err.message : 'Unknown error')
         } finally {
           setLoading(false)

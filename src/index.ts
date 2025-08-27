@@ -111,13 +111,11 @@ export default class ImageGalleryPlugin extends Plugin {
             this.clearTextualDescriptionsView(session)
           }
         } catch (e) {
-          // eslint-disable-next-line no-console
-          console.debug('Error in autorun logging', e)
+          // Silent handling of autorun errors to avoid console noise
         }
       })
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.debug('Failed to set autorun for selection logging', e)
+      // Silent handling of autorun setup errors
     }
   }
 
@@ -204,8 +202,7 @@ export default class ImageGalleryPlugin extends Plugin {
         )
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.debug('Error managing ImageGalleryView:', e)
+      // Silent handling of view management errors
     }
   }
 
@@ -267,8 +264,7 @@ export default class ImageGalleryPlugin extends Plugin {
         )
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.debug('Error managing TextualDescriptionsView:', e)
+      // Silent handling of view management errors
     }
   }
 
@@ -287,8 +283,7 @@ export default class ImageGalleryPlugin extends Plugin {
         }
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.debug('Error clearing ImageGalleryView:', e)
+      // Silent handling of view clearing errors
     }
   }
 
@@ -308,8 +303,7 @@ export default class ImageGalleryPlugin extends Plugin {
         }
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.debug('Error clearing TextualDescriptionsView:', e)
+      // Silent handling of view clearing errors
     }
   }
 
@@ -450,8 +444,7 @@ export default class ImageGalleryPlugin extends Plugin {
         }
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.debug('Error accessing subfeatures for textual content:', e)
+      // Silent handling of subfeature access errors
     }
 
     // Deduplicate content by URL while preserving order
@@ -598,8 +591,7 @@ export default class ImageGalleryPlugin extends Plugin {
         }
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.debug('Error accessing subfeatures:', e)
+      // Silent handling of subfeature access errors
     }
 
     // Deduplicate images by URL while preserving order
