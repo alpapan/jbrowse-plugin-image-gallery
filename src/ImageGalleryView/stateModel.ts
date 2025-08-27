@@ -32,10 +32,15 @@ const stateModel = types
 
     // Close the view by removing it from the session
     closeView() {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const session = (self as any).getRoot?.()?.session
-      if (session?.removeView) {
-        session.removeView(self)
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const session = (self as any).getRoot?.()?.session
+        if (session?.removeView) {
+          session.removeView(self)
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error closing view:', error)
       }
     },
 

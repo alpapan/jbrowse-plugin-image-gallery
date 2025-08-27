@@ -12,6 +12,8 @@ import {
 export default class ImageGalleryPlugin extends Plugin {
   name = 'ImageGalleryPlugin'
   version = version
+  private manuallyClosedViews = new Set<string>()
+  private lastSelectedFeatureId: string | undefined = undefined
 
   install(pluginManager: PluginManager) {
     pluginManager.addViewType(() => {
@@ -76,6 +78,18 @@ export default class ImageGalleryPlugin extends Plugin {
           ) {
             try {
               const viewId = 'imageGalleryView'
+              const featureKey = `${viewId}-${featureSummary.id}`
+
+              // Clear manually closed flag when selection changes to different feature
+              if (this.lastSelectedFeatureId !== featureSummary.id) {
+                this.manuallyClosedViews.clear()
+                this.lastSelectedFeatureId = featureSummary.id
+              }
+
+              // Don't recreate view if user manually closed it for this feature
+              if (this.manuallyClosedViews.has(featureKey)) {
+                return
+              }
 
               // eslint-disable-next-line no-console
               // console.debug('Managing ImageGalleryView for feature:', {
@@ -94,13 +108,19 @@ export default class ImageGalleryPlugin extends Plugin {
                   )
                 : null
 
-              if (!imageGalleryView && session) {
+              if (!imageGalleryView && session?.addView) {
                 // Create new ImageGalleryView if it doesn't exist
-                imageGalleryView = session.addView('ImageGalleryView', {
-                  id: viewId,
-                })
-                // eslint-disable-next-line no-console
-                // console.debug('Created new ImageGalleryView:', viewId)
+                try {
+                  imageGalleryView = session.addView('ImageGalleryView', {
+                    id: viewId,
+                    displayName: 'Image Gallery (Auto)',
+                  })
+                  // eslint-disable-next-line no-console
+                  console.log('Created new auto ImageGalleryView:', viewId)
+                } catch (e) {
+                  // eslint-disable-next-line no-console
+                  console.error('Failed to create ImageGalleryView:', e)
+                }
               }
               // Update the view with the current feature data
               if (imageGalleryView?.updateFeature) {
@@ -164,7 +184,7 @@ export default class ImageGalleryPlugin extends Plugin {
       // eslint-disable-next-line no-console
       // console.debug('Failed to set autorun for selection logging', e)
     }
-  } // Closing brace for install method
+  }
 
   configure(pluginManager: PluginManager) {
     if (isAbstractMenuManager(pluginManager.rootModel)) {
