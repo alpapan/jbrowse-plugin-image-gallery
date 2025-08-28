@@ -1,6 +1,7 @@
 import { MenuItem } from '@jbrowse/core/ui'
-import { ElementId } from '@jbrowse/core/util/types/mst'
 import { types } from 'mobx-state-tree'
+import { ElementId } from '@jbrowse/core/util/types/mst'
+import { getSession } from '@jbrowse/core/util'
 
 enum FeatureType {
   GENE = 'GENE',
@@ -55,10 +56,12 @@ const stateModel = types
     // Close the view by removing it from the session
     closeView() {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const session = (self as any).getRoot?.()?.session
+        const session = getSession(self)
         if (session?.removeView) {
-          session.removeView(self)
+          // Cast self as unknown then to AbstractViewModel for compatibility
+          session.removeView(
+            self as unknown as Parameters<typeof session.removeView>[0],
+          )
         }
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -171,15 +174,16 @@ const stateModel = types
     // Get available assemblies from session with proper error handling
     get availableAssemblies() {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const session = (self as any).getRoot?.()?.session
+        const session = getSession(self)
         if (!session) {
           return []
         }
 
         // Combine both configuration and session assemblies
         const configAssemblies = session.assemblies || []
-        const sessionAssemblies = session.sessionAssemblies || []
+        // Use any type for sessionAssemblies as it may not be in type definition
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sessionAssemblies = (session as any).sessionAssemblies || []
         const assemblies = [...configAssemblies, ...sessionAssemblies]
 
         return assemblies

@@ -1,260 +1,637 @@
 # JBrowse2 Plugin Development Guide for AI Agents
 
-if you need the jbrowse2 documentation, use the mcp file system with this path {"path": "/projects/jbrowse-components/website/docs"}
+This comprehensive guide provides AI agents with detailed information about developing plugins for JBrowse2, covering all major APIs, concepts, and best practices.
 
-## Overview
+## Table of Contents
 
-JBrowse2 is a modular genome browser built on **MST (mobx-state-tree)** architecture. Understanding MST tree connectivity is crucial for plugin development.
+1. [JBrowse2 Architecture Overview](#jbrowse2-architecture-overview)
+2. [Plugin Development Fundamentals](#plugin-development-fundamentals)
+3. [Pluggable Elements](#pluggable-elements)
+4. [View Types](#view-types)
+5. [Track Types](#track-types)
+6. [Display Types](#display-types)
+7. [Adapter Types](#adapter-types)
+8. [Renderer Types](#renderer-types)
+9. [Widget Types](#widget-types)
+10. [Session Management](#session-management)
+11. [Configuration System](#configuration-system)
+12. [Extension Points](#extension-points)
+13. [Jexl Expressions](#jexl-expressions)
+14. [Development Workflow](#development-workflow)
+15. [Best Practices](#best-practices)
 
-## Core Architecture Concepts
+## JBrowse2 Architecture Overview
 
-### 1. MST (Mobx-State-Tree) Fundamentals
+JBrowse2 is a modern, plugin-based genome browser built with:
+- **React** for UI components
+- **MobX State Tree (MST)** for state management
+- **TypeScript** for type safety
+- **Webpack/Rollup** for bundling
 
-JBrowse2 uses MST for state management, creating a **tree hierarchy** where:
-- **Root Model**: Top-level application state
-- **Session Model**: Contains views, tracks, assemblies 
-- **View Models**: Individual view instances (LinearGenomeView, etc.)
+### Core Concepts
 
-**Critical MST Tree Methods:**
-- `getRoot()`: Access root model (contains session)
-- `getParent()`: Access immediate parent node
-- `getEnv()`: Access environment/context
-- `hasParent()`: Check if node has parent connection
+- **Products**: Applications (jbrowse-web, jbrowse-desktop, jbrowse-cli)
+- **Plugins**: Runtime extensions that add functionality
+- **Pluggable Elements**: Modular components (views, tracks, adapters, etc.)
+- **Sessions**: User working environments containing views and tracks
+- **Configuration**: Declarative setup via JSON/TypeScript
 
-### 2. Session Access Patterns
+## Plugin Development Fundamentals
 
-**CORRECT Session Access:**
+### Plugin Structure
+
+Every JBrowse2 plugin extends `@jbrowse/core/Plugin` and implements:
+
 ```typescript
-// From any MST node connected to session tree
-const session = getRoot(self).session
-const session = getSession(self) // utility function
+export default class MyPlugin extends Plugin {
+  name = 'MyPlugin'
+  version = '1.0.0'
 
-// Access assemblies
-session.assemblies         // Array of assembly configurations
-session.assemblyManager   // AssemblyManager instance (if exists)
+  install(pluginManager: PluginManager) {
+    // Register pluggable elements here
+  }
+
+  configure(pluginManager: PluginManager) {
+    // Set up autoruns, Jexl functions, extension points
+  }
+}
 ```
 
-**WRONG Session Access:**
-```typescript
-// These will fail if MST tree not properly connected
-(self as any).getRoot?.()?.session  // Returns undefined if isolated
-self.session                        // Direct access doesn't exist
+### Plugin Template
+
+Use the [jbrowse-plugin-template](https://github.com/GMOD/jbrowse-plugin-template) for new plugins:
+
+```bash
+git clone https://github.com/GMOD/jbrowse-plugin-template.git my-plugin
+cd my-plugin
+yarn install
+yarn setup  # Sets up local JBrowse instance
+yarn start  # Runs plugin in development mode
+yarn browse # Runs JBrowse with plugin loaded
 ```
 
-## Plugin Architecture
+## Pluggable Elements
 
-### 3. View Type Registration
+Plugins can add various types of pluggable elements to extend JBrowse functionality.
 
-Views consist of three components:
+### Common Pluggable Element Types
+
+1. **View Types**: Custom visualization panels
+2. **Track Types**: Data display containers
+3. **Display Types**: Rendering methods for tracks in specific views
+4. **Adapter Types**: Data format parsers
+5. **Renderer Types**: Low-level drawing engines
+6. **Widget Types**: UI panels and dialogs
+7. **Connection Types**: Data source connections
+8. **Text Search Adapters**: Search functionality
+9. **Add Track Workflows**: Custom track addition processes
+
+## View Types
+
+Views are high-level containers that can display arbitrary content. They extend the base view functionality.
+
+### Creating a Custom View
 
 ```typescript
-// In plugin's install() method
+// src/MyCustomView/index.ts
+import { ConfigurationSchema } from '@jbrowse/core/configuration'
+import PluginManager from '@jbrowse/core/PluginManager'
+import { ViewType } from '@jbrowse/core/pluggableElementTypes'
+import { types } from 'mobx-state-tree'
+
+export const configSchema = ConfigurationSchema('MyCustomView', {
+  // Configuration slots
+})
+
+export const stateModelFactory = (pluginManager: PluginManager) => {
+  return types.model('MyCustomView', {
+    id: ElementId,
+    type: types.literal('MyCustomView'),
+    // View-specific state
+  })
+  .actions(self => ({
+    // View actions
+  }))
+  .views(self => ({
+    // View getters
+  }))
+}
+
+// src/index.ts
 pluginManager.addViewType(() => {
   return new ViewType({
     name: 'MyCustomView',
-    stateModel: myStateModel,        // MST state model
-    ReactComponent: MyReactComponent // React UI component
+    stateModel: stateModelFactory(pluginManager),
+    ReactComponent: MyCustomViewReactComponent,
   })
 })
 ```
 
-### 4. State Model Patterns
+### Built-in View Types
 
-**BaseViewModel Extension (Recommended):**
+- **LinearGenomeView**: Classic linear genome browser
+- **CircularView**: Circos-style circular genome view
+- **DotplotView**: Comparative 2D genome view
+- **SvInspectorView**: Structural variant inspector
+- **SpreadsheetView**: Tabular data view
+
+## Track Types
+
+Tracks are high-level concepts that control what data to display and how. They combine adapters, displays, and renderers.
+
+### Creating a Custom Track
+
 ```typescript
+// src/MyCustomTrack/index.ts
+import { ConfigurationSchema } from '@jbrowse/core/configuration'
+import { TrackType } from '@jbrowse/core/pluggableElementTypes'
+
+export const configSchema = ConfigurationSchema('MyCustomTrack', {
+  adapter: {
+    type: 'fileLocation',
+    defaultValue: { uri: '', locationType: 'UriLocation' },
+  },
+})
+
+pluginManager.addTrackType(() => {
+  return new TrackType({
+    name: 'MyCustomTrack',
+    configSchema,
+    stateModel: trackStateModelFactory(pluginManager),
+  })
+})
+```
+
+### Track Composition
+
+Tracks can be composed of multiple displays for different views:
+
+```typescript
+// Register displays for the track
+pluginManager.addDisplayType(() => {
+  return new DisplayType({
+    name: 'MyCustomDisplay',
+    configSchema: displayConfigSchema,
+    stateModel: displayStateModelFactory(pluginManager),
+    trackType: 'MyCustomTrack',
+    viewType: 'LinearGenomeView',
+    ReactComponent: MyCustomDisplayComponent,
+  })
+})
+```
+
+## Display Types
+
+Displays determine how tracks are rendered in specific views. A single track can have multiple displays for different view types.
+
+### Display Categories
+
+- **Linear Displays**: For LinearGenomeView
+- **Circular Displays**: For CircularView
+- **Comparative Displays**: For comparative views
+
+### Creating a Display
+
+```typescript
+export const configSchema = ConfigurationSchema('MyDisplay', {
+  renderer: {
+    type: 'rendererSelector',
+    defaultValue: { type: 'MyRenderer' },
+  },
+  // Display-specific config
+})
+
+pluginManager.addDisplayType(() => {
+  return new DisplayType({
+    name: 'MyDisplay',
+    configSchema,
+    stateModel: displayStateModelFactory(pluginManager),
+    trackType: 'MyTrack',
+    viewType: 'LinearGenomeView',
+    ReactComponent: MyDisplayComponent,
+  })
+})
+```
+
+## Adapter Types
+
+Adapters parse data from various formats and sources.
+
+### Common Adapter Types
+
+- **BamAdapter**: Binary Alignment Map files
+- **CramAdapter**: Compressed Reference-oriented Alignment Map
+- **VcfAdapter**: Variant Call Format files
+- **Gff3Adapter**: Generic Feature Format v3
+- **BedAdapter**: Browser Extensible Data format
+- **TwoBitAdapter**: 2bit sequence files
+- **BigWigAdapter**: BigWig quantitative data
+- **HicAdapter**: Hi-C contact matrix data
+
+### Creating a Custom Adapter
+
+```typescript
+export const configSchema = ConfigurationSchema('MyAdapter', {
+  location: {
+    type: 'fileLocation',
+    defaultValue: { uri: '', locationType: 'UriLocation' },
+  },
+})
+
+pluginManager.addAdapterType(() => {
+  return new AdapterType({
+    name: 'MyAdapter',
+    configSchema,
+    adapterClass: MyAdapterClass,
+  })
+})
+```
+
+## Renderer Types
+
+Renderers handle the actual drawing of features. They can run in the main thread, web workers, or server-side.
+
+### Renderer Architecture
+
+- **Feature Renderers**: Draw individual features
+- **Pileup Renderers**: Draw stacked alignments
+- **Quantitative Renderers**: Draw wiggle plots
+- **Comparative Renderers**: Draw synteny/contact data
+
+### Creating a Renderer
+
+```typescript
+export const configSchema = ConfigurationSchema('MyRenderer', {
+  color: {
+    type: 'color',
+    defaultValue: 'blue',
+  },
+})
+
+pluginManager.addRendererType(() => {
+  return new RendererType({
+    name: 'MyRenderer',
+    configSchema,
+    ReactComponent: MyRendererComponent,
+    pluginManager,
+  })
+})
+```
+
+## Widget Types
+
+Widgets are custom UI panels that can appear in side panels, modals, or drawers.
+
+### Widget Categories
+
+- **Feature Detail Widgets**: Show feature information
+- **Configuration Widgets**: Configure tracks/views
+- **Add Track Widgets**: Custom track addition workflows
+- **Custom Widgets**: Application-specific panels
+
+### Creating a Widget
+
+```typescript
+// src/MyWidget/index.tsx
+import { ConfigurationSchema } from '@jbrowse/core/configuration'
+import { WidgetType } from '@jbrowse/core/pluggableElementTypes'
 import { types } from 'mobx-state-tree'
-import { BaseViewModel } from '@jbrowse/core/pluggableElementTypes/models/BaseViewModel'
 
-const MyViewModel = BaseViewModel
-  .named('MyCustomView')
-  .props({
-    type: types.literal('MyCustomView'),
-    // Custom properties
-  })
-  .views(self => ({
-    // Getters - access session here
-    get availableAssemblies() {
-      const session = getSession(self)
-      return session?.assemblies || []
-    }
-  }))
-  .actions(self => ({
-    // Actions/mutations
-  }))
-```
+export const configSchema = ConfigurationSchema('MyWidget', {})
 
-**Manual MST Model:**
-```typescript
-const MyViewModel = types
-  .model('MyCustomView', {
+export function stateModelFactory(pluginManager: PluginManager) {
+  return types.model('MyWidget', {
     id: ElementId,
-    type: types.literal('MyCustomView'),
-    // other props
+    type: types.literal('MyWidget'),
+    // Widget state
   })
-  .views(self => ({
-    get availableAssemblies() {
-      try {
-        const session = getRoot(self)?.session
-        return session?.assemblies || []
-      } catch {
-        return []
-      }
-    }
+  .actions(self => ({
+    // Widget actions
   }))
-```
+}
 
-## Common Issues and Solutions
+export { default as ReactComponent } from './MyWidget'
 
-### 5. MST Tree Connection Problems
-
-**Problem:** `getRoot()` returns `undefined`
-**Cause:** View not properly connected to session MST tree
-**Debug Signs:**
-- `getRoot()` → `undefined`
-- `getParent()` → `undefined` 
-- `getEnv()` → `undefined`
-- View exists as isolated MST node
-
-**Solution:** Views must be added to session via `session.addView()` with proper MST composition
-
-### 6. View Creation Methods
-
-**Automatic Creation (autorun):**
-```typescript
-// In plugin install() - autoruns when features selected
-autorun(() => {
-  // Runs automatically, creates connected views
-  session.addView('MyView', viewSnapshot)
+// src/index.ts
+pluginManager.addWidgetType(() => {
+  return new WidgetType({
+    name: 'MyWidget',
+    configSchema,
+    stateModel: stateModelFactory(pluginManager),
+    ReactComponent: MyWidgetComponent,
+  })
 })
 ```
 
-**Manual Creation (Add Menu):**
+## Session Management
+
+Sessions manage the user's working environment, including views, tracks, and global state.
+
+### Session Model Structure
+
 ```typescript
-// In plugin configure() - triggered by user
-pluginManager.rootModel.appendToMenu('Add', {
-  label: 'My Custom View',
-  onClick: (session: AbstractSessionModel) => {
-    session.addView('MyView', {})  // Must ensure MST tree connection
+interface BaseSessionModel {
+  id: string
+  name: string
+  margin: number
+
+  // Core functionality
+  setSelection(thing: unknown): void
+  clearSelection(): void
+  setHovered(thing: unknown): void
+
+  // Views management
+  addView(viewType: string, config: any): AbstractViewModel
+  removeView(view: AbstractViewModel): void
+  views: AbstractViewModel[]
+
+  // Tracks management
+  addTrack(trackConfig: any): TrackModel
+  removeTrack(track: TrackModel): void
+  tracks: TrackModel[]
+
+  // Widgets
+  addWidget(widgetType: string, id: string, config: any): WidgetModel
+  removeWidget(widget: WidgetModel): void
+  showWidget(widget: WidgetModel): void
+
+  // Configuration
+  configuration: JBrowseConfigModel
+  assemblies: AssemblyModel[]
+}
+```
+
+### Working with Sessions
+
+```typescript
+// Get current session
+const session = getSession(model)
+
+// Add a view
+const view = session.addView('LinearGenomeView', {
+  assembly: 'hg38',
+  loc: 'chr1:1-100000'
+})
+
+// Add a track
+const track = session.addTrack({
+  type: 'VariantTrack',
+  trackId: 'my-vcf',
+  name: 'My VCF',
+  assemblyNames: ['hg38'],
+  adapter: {
+    type: 'VcfAdapter',
+    vcfLocation: { uri: 'data.vcf.gz', locationType: 'UriLocation' }
   }
 })
+
+// Show a widget
+const widget = session.addWidget('FeatureDetailWidget', 'feature-detail', {
+  feature: selectedFeature
+})
+session.showWidget(widget)
 ```
 
-## Assembly and Track Access
+## Configuration System
 
-### 7. Assembly Information
+JBrowse2 uses a typed configuration system with slots and schemas.
+
+### Configuration Slot Types
+
+- `string`: Text input
+- `number`/`integer`: Numeric input
+- `boolean`: Checkbox
+- `color`: Color picker
+- `stringEnum`: Dropdown selection
+- `fileLocation`: File/URL input
+- `frozen`: Arbitrary JSON
+- `text`: Multi-line text
+- `stringArray`: List of strings
+- `stringArrayMap`: Key-value pairs
+
+### Creating Configuration Schemas
 
 ```typescript
-// From connected view state model
-get availableAssemblies() {
-  const session = getSession(self)
-  if (!session) return []
-  
-  // Session assemblies (user-added)
-  const sessionAssemblies = session.sessionAssemblies || []
-  
-  // Configuration assemblies
-  const configAssemblies = session.assemblies || []
-  
-  return [...sessionAssemblies, ...configAssemblies]
+import { ConfigurationSchema } from '@jbrowse/core/configuration'
+
+const myConfigSchema = ConfigurationSchema('MyElement', {
+  // Simple string slot
+  name: {
+    type: 'string',
+    description: 'Display name',
+    defaultValue: 'My Element',
+  },
+
+  // Enum with options
+  displayMode: {
+    type: 'stringEnum',
+    model: types.enumeration('Mode', ['normal', 'compact', 'detailed']),
+    description: 'Display mode',
+    defaultValue: 'normal',
+  },
+
+  // Color picker
+  color: {
+    type: 'color',
+    description: 'Feature color',
+    defaultValue: '#0000FF',
+  },
+
+  // File location
+  dataFile: {
+    type: 'fileLocation',
+    description: 'Data file location',
+    defaultValue: { uri: '', locationType: 'UriLocation' },
+  },
+
+  // Sub-schema
+  advanced: ConfigurationSchema('AdvancedOptions', {
+    threshold: {
+      type: 'number',
+      description: 'Threshold value',
+      defaultValue: 0.5,
+    },
+  }),
+})
+```
+
+### Reading Configuration Values
+
+```typescript
+import { readConfObject } from '@jbrowse/core/configuration'
+
+// Read simple value
+const name = readConfObject(config, 'name')
+
+// Read nested value
+const threshold = readConfObject(config, ['advanced', 'threshold'])
+
+// Read with context variables (for Jexl callbacks)
+const color = readConfObject(config, 'color', { feature })
+```
+
+## Extension Points
+
+Extension points allow plugins to register callbacks that are executed at specific times.
+
+### Using Extension Points
+
+```typescript
+// Producer: Evaluate extension point
+const result = pluginManager.evaluateExtensionPoint(
+  'MyExtensionPoint',
+  initialValue,
+  context
+)
+
+// Consumer: Register callback
+pluginManager.addToExtensionPoint(
+  'MyExtensionPoint',
+  (value, context) => {
+    // Process value
+    return modifiedValue
+  }
+)
+```
+
+### Common Extension Points
+
+- `Core-extendPluggableElement`: Extend pluggable element models
+- `Core-guessAdapterForLocation`: Infer adapter from file location
+- `Core-guessTrackTypeForLocation`: Infer track type from file location
+- `Core-replaceAbout`: Replace about dialog
+- `Core-extraAboutPanel`: Add about dialog panels
+- `Core-replaceWidget`: Replace widget components
+- `Core-extraFeaturePanel`: Add feature detail panels
+- `LaunchView-LinearGenomeView`: Launch linear genome view
+- `Core-preProcessTrackConfig`: Pre-process track configuration
+
+## Jexl Expressions
+
+JBrowse2 uses Jexl (JavaScript Expression Language) for dynamic configuration.
+
+### Jexl in Configuration
+
+```json
+{
+  "type": "VariantTrack",
+  "displays": [
+    {
+      "type": "LinearVariantDisplay",
+      "renderer": {
+        "type": "SvgFeatureRenderer",
+        "color": "jexl:get(feature, 'type') === 'SNV' ? 'green' : 'red'"
+      }
+    }
+  ]
 }
 ```
 
-### 8. Track Information
+### Adding Custom Jexl Functions
 
 ```typescript
-get availableTracks() {
-  const session = getSession(self)
-  if (!session?.assemblyManager) return []
-  
-  const assembly = session.assemblyManager.get(self.selectedAssemblyId)
-  if (!assembly) return []
-  
-  // Get tracks for selected assembly
-  return session.tracks.filter(track => 
-    track.assemblyNames.includes(assembly.name)
-  )
+// In plugin configure() method
+pluginManager.jexl.addFunction('myFunction', (feature, track) => {
+  // Custom logic
+  return feature.name.toUpperCase()
+})
+
+// Use in configuration
+{
+  "color": "jexl:myFunction(feature, track)"
 }
 ```
+
+## Development Workflow
+
+### Setting Up Development Environment
+
+1. **Clone plugin template**
+   ```bash
+   git clone https://github.com/GMOD/jbrowse-plugin-template.git my-plugin
+   cd my-plugin
+   yarn install
+   ```
+
+2. **Set up JBrowse**
+   ```bash
+   yarn setup
+   ```
+
+3. **Start development**
+   ```bash
+   yarn start  # Plugin development server
+   yarn browse # JBrowse with plugin
+   ```
+
+### Testing
+
+- **Integration Tests**: Use Cypress for end-to-end testing
+- **Unit Tests**: Use Jest for component testing
+- **Manual Testing**: Test in browser with development server
+
+### Building for Production
+
+```bash
+yarn build
+```
+
+### Publishing to NPM
+
+```bash
+yarn publish
+```
+
+### Adding to Plugin Store
+
+1. Fork [jbrowse-plugin-list](https://github.com/GMOD/jbrowse-plugin-list)
+2. Add plugin to `plugins.json`
+3. Submit pull request
 
 ## Best Practices
 
-### 9. Error Handling
+### Code Organization
 
-Always wrap session access in try-catch:
-```typescript
-get availableAssemblies() {
-  try {
-    const session = getSession(self)
-    return session?.assemblies || []
-  } catch (error) {
-    console.warn('Failed to access session:', error)
-    return []
-  }
-}
-```
+- **Separate concerns**: Keep state models, React components, and configuration separate
+- **Use TypeScript**: Leverage type safety
+- **Follow naming conventions**: Use consistent naming for pluggable elements
+- **Document APIs**: Add JSDoc comments for public APIs
 
-### 10. Debugging MST Connection
+### Performance
 
-Add temporary debug logging:
-```typescript
-get availableAssemblies() {
-  console.log('=== DEBUG: Session access ===')
-  console.log('getRoot():', getRoot(self))
-  console.log('getParent():', getParent(self))
-  console.log('hasParent():', hasParent(self))
-  
-  const session = getSession(self)
-  console.log('session:', session)
-  console.log('assemblies:', session?.assemblies)
-  
-  return session?.assemblies || []
-}
-```
+- **Use web workers**: For computationally intensive renderers
+- **Implement virtualization**: For large datasets
+- **Optimize re-renders**: Use MobX observers appropriately
+- **Lazy load**: Load heavy components only when needed
 
-### 11. Plugin Structure
+### Configuration
 
-```
-src/
-├── index.ts                 # Plugin registration
-├── MyView/
-│   ├── stateModel.ts       # MST state model
-│   ├── component.tsx       # React component  
-│   └── index.ts           # Exports
-```
+- **Provide sensible defaults**: Make plugins work out-of-the-box
+- **Use Jexl callbacks**: For dynamic configuration
+- **Validate inputs**: Use configuration schema validation
+- **Document options**: Clear descriptions for all config slots
 
-### 12. Essential Imports
+### Error Handling
 
-```typescript
-// Core JBrowse imports
-import { types } from 'mobx-state-tree'
-import { ViewType } from '@jbrowse/core/pluggableElementTypes'
-import { getSession } from '@jbrowse/core/util'
-import { BaseViewModel } from '@jbrowse/core/pluggableElementTypes/models/BaseViewModel'
-import { ElementId } from '@jbrowse/core/util/types/mst'
+- **Graceful degradation**: Handle missing data gracefully
+- **User feedback**: Show loading states and error messages
+- **Logging**: Use console for debugging (remove in production)
+- **Type safety**: Use TypeScript to catch errors at compile time
 
-// Session types
-import { AbstractSessionModel } from '@jbrowse/core/util'
-```
+### Testing
 
-## Key Takeaways
+- **Write integration tests**: Test complete user workflows
+- **Mock external APIs**: For reliable testing
+- **Test configuration**: Verify config schemas work correctly
+- **Cross-browser testing**: Test in supported browsers
 
-1. **MST Tree Connection is Critical**: Views must be properly connected to session tree to access assemblies/tracks
-2. **Use getSession() or getRoot().session**: Never access session directly on self
-3. **Extend BaseViewModel when possible**: Provides standard view functionality
-4. **Handle connection failures gracefully**: Always check if session exists before accessing
-5. **Debug MST tree state**: Use getRoot(), getParent(), hasParent() to verify connectivity
-6. **Session contains assemblies**: Access via `session.assemblies` array
-7. **AssemblyManager provides assembly details**: Use `session.assemblyManager.get(id)`
+### Documentation
 
-## Common Session Properties
+- **README**: Include setup and usage instructions
+- **Code comments**: Document complex logic
+- **Configuration examples**: Show common use cases
+- **API documentation**: Document public methods
 
-```typescript
-interface Session {
-  assemblies: Assembly[]           // Configuration assemblies
-  sessionAssemblies: Assembly[]    // Runtime assemblies  
-  tracks: Track[]                  // Available tracks
-  views: View[]                    // Active views
-  assemblyManager: AssemblyManager // Assembly utilities
-  addView(type: string, snapshot: any): View
-}
-```
+This guide covers the essential concepts and APIs for developing JBrowse2 plugins. For more detailed examples, refer to the [JBrowse2 developer documentation](https://jbrowse.org/jb2/docs/) and existing plugin repositories.</content>
+</details>
+</use_mcp_tool>
