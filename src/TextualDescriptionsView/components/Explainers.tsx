@@ -575,9 +575,30 @@ export const TextualDescriptionsViewF: React.FC<TextualDescriptionsViewProps> =
       void loadContent()
     }, [model.featureMarkdownUrls, model.selectedFeatureId])
 
-    // Show nothing if no feature is selected
+    // Show placeholder message when no feature is selected
     if (!model.selectedFeatureId) {
-      return null
+      return (
+        <Paper
+          elevation={12}
+          sx={{
+            padding: 2,
+            margin: 1,
+            minHeight: 200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+          }}
+          className="MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation12 css-4h24oc-MuiPaper-root-viewContainer-unfocusedView"
+        >
+          <Typography variant="h6" color="textSecondary">
+            No feature with textual descriptions selected
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+            When you select a feature with textual content, it will appear here
+          </Typography>
+        </Paper>
+      )
     }
 
     if (loading) {

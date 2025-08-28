@@ -133,14 +133,20 @@ export default class RichAnnotationsPlugin extends Plugin {
       pluginManager.rootModel.appendToMenu('Add', {
         label: 'Image Gallery View',
         onClick: (session: AbstractSessionModel) => {
-          session.addView('ImageGalleryView', {})
+          session.addView('ImageGalleryView', {
+            id: 'imageGalleryView',
+            displayName: 'Image Gallery',
+          })
         },
       })
 
       pluginManager.rootModel.appendToMenu('Add', {
         label: 'Textual Descriptions View',
         onClick: (session: AbstractSessionModel) => {
-          session.addView('TextualDescriptionsView', {})
+          session.addView('TextualDescriptionsView', {
+            id: 'textualDescriptionsView',
+            displayName: 'Textual Descriptions',
+          })
         },
       })
 
@@ -276,27 +282,15 @@ export default class RichAnnotationsPlugin extends Plugin {
         return
       }
 
-      // Check if ImageGalleryView already exists
-      let imageGalleryView = session?.views
+      // Check if ImageGalleryView already exists - do NOT create new ones automatically
+      const imageGalleryView = session?.views
         ? (session.views.find(
             view => view.type === 'ImageGalleryView' && view.id === viewId,
           ) as unknown as ImageGalleryView)
         : null
 
-      if (!imageGalleryView && session?.addView) {
-        // Create new ImageGalleryView if it doesn't exist
-        try {
-          imageGalleryView = session.addView('ImageGalleryView', {
-            id: viewId,
-            displayName: 'Image Gallery',
-          }) as unknown as ImageGalleryView
-        } catch (e) {
-          console.error('Failed to create ImageGalleryView:', e)
-          return // Don't try to update if creation failed
-        }
-      }
-
-      // Atomic update: Ensure we have a view and valid feature data before updating
+      // Only update existing views, don't create new ones
+      // Views should only be created when user explicitly adds them via menu
       if (
         imageGalleryView?.updateFeature &&
         featureSummary.id &&
@@ -344,7 +338,7 @@ export default class RichAnnotationsPlugin extends Plugin {
     try {
       const viewId = 'imageGalleryView'
 
-      // Check if ImageGalleryView already exists
+      // Check if ImageGalleryView already exists - do NOT create new ones automatically
       const imageGalleryView = session?.views
         ? (session.views.find(
             view => view.type === 'ImageGalleryView' && view.id === viewId,
@@ -352,6 +346,7 @@ export default class RichAnnotationsPlugin extends Plugin {
         : null
 
       // Only update existing views, don't create new ones for features without images
+      // Views should only be created when user explicitly adds them via menu
       if (imageGalleryView?.updateFeatureWithoutImages && featureSummary.id) {
         imageGalleryView.updateFeatureWithoutImages(
           featureSummary.id,
@@ -384,29 +379,16 @@ export default class RichAnnotationsPlugin extends Plugin {
         return
       }
 
-      // Check if TextualDescriptionsView already exists
-      let textualDescriptionsView = session?.views
+      // Check if TextualDescriptionsView already exists - do NOT create new ones automatically
+      const textualDescriptionsView = session?.views
         ? (session.views.find(
             view =>
               view.type === 'TextualDescriptionsView' && view.id === viewId,
           ) as unknown as TextualDescriptionsView)
         : null
 
-      if (!textualDescriptionsView && session?.addView) {
-        // Create new TextualDescriptionsView if it doesn't exist
-        try {
-          textualDescriptionsView = session.addView('TextualDescriptionsView', {
-            id: viewId,
-            displayName: 'Textual Descriptions',
-          }) as unknown as TextualDescriptionsView
-        } catch (e) {
-          console.error('Failed to create TextualDescriptionsView:', e)
-          return // Don't try to update if creation failed
-        }
-      }
-
-      // Update the view with the current feature data
-      // Always call updateFeature to set selectedFeatureId, even if no markdown_urls
+      // Only update existing views, don't create new ones
+      // Views should only be created when user explicitly adds them via menu
       if (textualDescriptionsView?.updateFeature) {
         // Convert arrays to comma-separated strings if needed
         const markdownUrlsString: string = Array.isArray(
