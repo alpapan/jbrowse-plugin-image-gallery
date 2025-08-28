@@ -34,6 +34,7 @@ const stateModel = types
     featureDescriptions: types.maybe(types.string),
     featureLabels: types.maybe(types.string),
     featureTypes: types.maybe(types.string),
+    featureMarkdownUrls: types.maybe(types.string),
     // Loading states for progressive UI
     isLoadingTracks: types.optional(types.boolean, false),
     isLoadingFeatures: types.optional(types.boolean, false),
@@ -105,17 +106,17 @@ const stateModel = types
     setSelectedFeature(
       featureId: string | undefined,
       featureType?: FeatureType,
+      markdownUrls?: string,
       descriptions?: string,
-      labels?: string,
-      types?: string,
+      contentTypes?: string,
     ) {
       self.selectedFeatureId = featureId
       if (featureType) {
         self.selectedFeatureType = featureType.toString()
       }
 
-      if (featureId && descriptions) {
-        this.updateFeatureContent(descriptions, labels, types)
+      if (featureId && (descriptions ?? markdownUrls)) {
+        this.updateFeatureContent(descriptions, markdownUrls, contentTypes)
       } else {
         this.clearFeatureContent()
       }
@@ -123,11 +124,11 @@ const stateModel = types
 
     // Update the feature content displayed in this view
     updateFeatureContent(
-      descriptions: string,
-      labels?: string,
-      types?: string,
+      descriptions?: string,
+      markdownUrls?: string,
+      contentTypes?: string,
     ) {
-      // Only process descriptions if they exist and are not empty
+      // Process descriptions if they exist and are not empty
       if (descriptions && descriptions.trim() !== '') {
         // Parse comma-separated strings from GFF3 attributes (not JSON)
         const descriptionList = descriptions
@@ -135,17 +136,29 @@ const stateModel = types
           .map(desc => desc.trim())
           .filter(desc => desc.length > 0)
 
-        const labelList = labels
-          ? labels.split(',').map(label => label.trim())
-          : []
-        const typeList = types ? types.split(',').map(type => type.trim()) : []
-
-        // Store processed data
         self.featureDescriptions = descriptionList.join(',')
-        self.featureLabels = labelList.join(',')
+      } else {
+        self.featureDescriptions = ''
+      }
+
+      // Process markdown URLs if they exist and are not empty
+      if (markdownUrls && markdownUrls.trim() !== '') {
+        const urlList = markdownUrls
+          .split(',')
+          .map(url => url.trim())
+          .filter(url => url.length > 0)
+
+        self.featureMarkdownUrls = urlList.join(',')
+      } else {
+        self.featureMarkdownUrls = ''
+      }
+
+      // Process content types if they exist and are not empty
+      if (contentTypes && contentTypes.trim() !== '') {
+        const typeList = contentTypes.split(',').map(type => type.trim())
         self.featureTypes = typeList.join(',')
       } else {
-        this.clearFeatureContent()
+        self.featureTypes = ''
       }
     },
 
@@ -154,6 +167,7 @@ const stateModel = types
       self.featureDescriptions = ''
       self.featureLabels = ''
       self.featureTypes = ''
+      self.featureMarkdownUrls = ''
     },
 
     // Clear all selections and content
@@ -285,7 +299,8 @@ const stateModel = types
     // Computed properties for easy access
     get hasContent() {
       return !!(
-        self.featureDescriptions && self.featureDescriptions.trim() !== ''
+        (self.featureDescriptions && self.featureDescriptions.trim() !== '') ??
+        (self.featureMarkdownUrls && self.featureMarkdownUrls.trim() !== '')
       )
     },
 

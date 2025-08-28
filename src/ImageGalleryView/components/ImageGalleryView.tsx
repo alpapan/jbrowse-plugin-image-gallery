@@ -40,6 +40,20 @@ const ExpandLess: React.FC = () => (
   </svg>
 )
 
+// Minimize icon component
+const Minimize: React.FC = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M6 19h12v2H6z" />
+  </svg>
+)
+
+// Expand icon component
+const Expand: React.FC = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 5.83L15.17 9l1.41-1.41L12 3 7.41 7.59 8.83 9 12 5.83zM12 18.17L8.83 15l-1.41 1.41L12 21l4.59-4.59L15.17 15 12 18.17z" />
+  </svg>
+)
+
 interface ImageData {
   url: string
   label: string
@@ -78,6 +92,8 @@ interface ImageGalleryViewProps {
     featureTypes?: string
     hasContent: boolean
     displayTitle: string
+    minimized: boolean
+    setMinimized: (flag: boolean) => void
   }
 }
 
@@ -536,6 +552,10 @@ const ImageGalleryContent = observer(function ImageGalleryContent({
 const ImageGalleryView = observer(function ImageGalleryView({
   model,
 }: ImageGalleryViewProps) {
+  const handleMinimizeToggle = () => {
+    model.setMinimized(!model.minimized)
+  }
+
   if (!model.hasContent) {
     return (
       <Paper
@@ -543,20 +563,51 @@ const ImageGalleryView = observer(function ImageGalleryView({
         sx={{
           padding: 2,
           margin: 1,
-          minHeight: 200,
+          minHeight: model.minimized ? 'auto' : 200,
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: model.minimized ? 'stretch' : 'center',
+          justifyContent: model.minimized ? 'flex-start' : 'center',
           flexDirection: 'column',
         }}
         className="MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation12 css-4h24oc-MuiPaper-root-viewContainer-unfocusedView"
       >
-        <Typography variant="h6" color="textSecondary">
-          No feature with images selected
-        </Typography>
-        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-          When you select a feature with images, they will appear here
-        </Typography>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            mb: model.minimized ? 0 : 2,
+          }}
+        >
+          <Typography variant="h6" color="textSecondary">
+            {model.minimized
+              ? model.displayTitle
+              : 'No feature with images selected'}
+          </Typography>
+          <IconButton
+            size="small"
+            onClick={handleMinimizeToggle}
+            title={model.minimized ? 'Expand view' : 'Minimize view'}
+          >
+            {model.minimized ? <Expand /> : <Minimize />}
+          </IconButton>
+        </Box>
+
+        <Collapse in={!model.minimized}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'column',
+            }}
+          >
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+              When you select a feature with images, they will appear here
+            </Typography>
+          </Box>
+        </Collapse>
       </Paper>
     )
   }
@@ -567,27 +618,43 @@ const ImageGalleryView = observer(function ImageGalleryView({
       sx={{
         padding: 1,
         margin: 1,
-        minHeight: 200,
+        minHeight: model.minimized ? 'auto' : 200,
       }}
       className="MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation12 css-4h24oc-MuiPaper-root-viewContainer-unfocusedView"
     >
-      <Box sx={{ mb: 1 }}>
+      <Box
+        sx={{
+          mb: model.minimized ? 0 : 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
         <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 'bold' }}>
           {model.displayTitle}
         </Typography>
+        <IconButton
+          size="small"
+          onClick={handleMinimizeToggle}
+          title={model.minimized ? 'Expand view' : 'Minimize view'}
+        >
+          {model.minimized ? <Expand /> : <Minimize />}
+        </IconButton>
       </Box>
 
-      {/* Use the merged ImageGalleryContent component */}
-      <ImageGalleryContent
-        featureImages={model.featureImages}
-        featureLabels={model.featureLabels}
-        featureTypes={model.featureTypes}
-        config={{
-          maxImages: 10,
-          maxImageHeight: 200,
-          validateUrls: true,
-        }}
-      />
+      <Collapse in={!model.minimized}>
+        {/* Use the merged ImageGalleryContent component */}
+        <ImageGalleryContent
+          featureImages={model.featureImages}
+          featureLabels={model.featureLabels}
+          featureTypes={model.featureTypes}
+          config={{
+            maxImages: 10,
+            maxImageHeight: 200,
+            validateUrls: true,
+          }}
+        />
+      </Collapse>
     </Paper>
   )
 })
