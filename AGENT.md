@@ -1,3 +1,4 @@
+# Agent Rules Standard (AGENT.md):
 # JBrowse2 Plugin Development API Reference
 
 This comprehensive guide provides detailed API documentation for developing plugins in JBrowse2, covering all major APIs, methods, properties, and concepts.
@@ -18,10 +19,12 @@ This comprehensive guide provides detailed API documentation for developing plug
 12. [Extension Points API](#extension-points-api)
 13. [Jexl Expressions API](#jexl-expressions-api)
 14. [Best Practices](#best-practices)
+15. [Common Issues and Solutions](#common-issues-and-solutions)
 
 ## JBrowse2 Architecture Overview
 
 JBrowse2 is a modern, plugin-based genome browser built with:
+
 - **React** for UI components
 - **MobX State Tree (MST)** for state management
 - **TypeScript** for type safety
@@ -52,7 +55,7 @@ export default class MyPlugin extends Plugin {
     // .addViewType(() => new ViewType({ name, stateModel, ReactComponent }))
     // .addTrackType(() => new TrackType({ name, configSchema, stateModel }))
     // .addDisplayType(() => new DisplayType({ name, configSchema, stateModel, trackType, viewType, ReactComponent }))
-    // .addAdapterType(() => new AdapterType({ name, configSchema, adapterClass }))
+    // .addAdapterType(() => new AdapterType({ name, configSchema, adapterClass }))}
     // .addRendererType(() => new RendererType({ name, configSchema, ReactComponent, pluginManager }))
     // .addWidgetType(() => new WidgetType({ name, configSchema, stateModel, ReactComponent }))
     // .addConnectionType(() => new ConnectionType({ name, configSchema, ConnectionClass, configDefaults }));
@@ -269,8 +272,7 @@ pluginManager.addDisplayType(() => {
     viewType: 'LinearGenomeView',
     ReactComponent: MyDisplayComponent,
   })
-})
-```
+})```
 
 ## Adapter Types API
 
@@ -440,13 +442,13 @@ class MyRenderer implements ServerSideRendererType {
         width,
       }
     } else {
-       // Fallback for non-OffscreenCanvas environments (e.g., Node.js, some browsers)
-       // This would typically involve serializing drawing commands or returning only ReactElement
-       return {
-         reactElement: React.createElement(this.ReactComponent, { ...props }),
-         height,
-         width,
-       }
+      // Fallback for non-OffscreenCanvas environments (e.g., Node.js, some browsers)
+      // This would typically involve serializing drawing commands or returning only ReactElement
+      return {
+        reactElement: React.createElement(this.ReactComponent, { ...props }),
+        height,
+        width,
+      }
     }
   }
 
@@ -478,8 +480,7 @@ pluginManager.addRendererType(() => {
     ReactComponent: MyRendererComponent,
     pluginManager,
   })
-})
-```
+})```
 
 ## Widget Types API
 
@@ -507,7 +508,7 @@ export function stateModelFactory(pluginManager: PluginManager) {
     id: ElementId,
     type: types.literal('MyWidget'),
     // Widget-specific state properties
-    featureData: types.frozen({}), // Example: for a feature detail widget
+    featureData: types.frozen({}),
     widgetByline: types.optional(types.string, 'Default widget byline'), // Example: custom text
   })
   .actions(self => ({
@@ -518,10 +519,11 @@ export function stateModelFactory(pluginManager: PluginManager) {
   }))
   .views(self => ({
     // Widget getters
-    get getWidgetByline() { return self.widgetByline },
+    get getWidgetByline() { return self.widgetByline || 'Default sybilline' },
     get hasFeatureData() { return Object.keys(self.featureData).length > 0 },
   }))
 }
+
 
 export { default as ReactComponent } from './MyWidget'
 
@@ -533,8 +535,7 @@ pluginManager.addWidgetType(() => {
     stateModel: stateModelFactory(pluginManager),
     ReactComponent: MyWidgetComponent,
   })
-})
-```
+})```
 
 ## Session Management API
 
@@ -543,6 +544,7 @@ Sessions manage the user's working environment, including views, tracks, and glo
 ### Session Model Structure
 
 A base session model defines the core API for managing application state.
+
 
 ```typescript
 interface BaseSessionModel {
@@ -593,6 +595,7 @@ const session = getSession(model)
 
 ```
 
+
 ## Configuration System API
 
 JBrowse2 uses a typed configuration system with slots and schemas.
@@ -613,6 +616,7 @@ JBrowse2 uses a typed configuration system with slots and schemas.
 ### Creating Configuration Schemas
 
 Configuration schemas are created using `ConfigurationSchema` and define the structure and default values for configurable elements.
+
 
 ```typescript
 import { ConfigurationSchema } from '@jbrowse/core/configuration'
@@ -659,9 +663,11 @@ const myConfigSchema = ConfigurationSchema('MyElement', {
 })
 ```
 
+
 ### Reading Configuration Values
 
 Use `readConfObject` to safely access configuration values, including handling default values and Jexl callbacks.
+
 
 ```typescript
 import { readConfObject } from '@jbrowse/core/configuration'
@@ -675,9 +681,10 @@ const name = readConfObject(config, 'name') // e.g., 'My Element'
 const threshold = readConfObject(config, ['advanced', 'threshold']) // e.g., 0.5
 
 // Read with context variables (for Jexl callbacks)
-const feature = { type: 'SNV', name: 'mySNP' } // Example context variable
+const feature = { type: 'SNV', name: 'mySNP’ } // Example context variable
 const color = readConfObject(config, 'color', { feature }) // Evaluates any Jexl expression in 'color' slot using 'feature'
 ```
+
 
 ## Extension Points API
 
@@ -717,8 +724,7 @@ pluginManager.addToExtensionPoint(
     const modifiedValue = { ...value, processed: true }
     return modifiedValue // Return the (potentially modified) value for the next callback in the chain
   }
-)
-```
+)```
 
 ### Common Extension Points
 
@@ -766,6 +772,7 @@ JBrowse2 uses Jexl (JavaScript Expression Language) for dynamic configuration.
 
 Jexl expressions allow configuration values to be dynamically computed based on runtime data (e.g., feature properties, track state).
 
+
 ```json
 {
   "type": "VariantTrack",
@@ -781,9 +788,11 @@ Jexl expressions allow configuration values to be dynamically computed based on 
 }
 ```
 
+
 ### Adding Custom Jexl Functions
 
 Plugins can extend Jexl with custom functions available in configuration.
+
 
 ```typescript
 // In plugin configure() method
@@ -797,6 +806,7 @@ pluginManager.jexl.addFunction('myFunction', (feature: any, track: any) => {
 //   "color": "jexl:myFunction(feature, track)"
 // }
 ```
+
 
 ## Best Practices
 
@@ -827,3 +837,51 @@ pluginManager.jexl.addFunction('myFunction', (feature: any, track: any) => {
 -   **User feedback**: Show loading states, error messages, and success notifications.
 -   **Logging**: Use console for debugging during development (remove or reduce verbosity in production).
 -   **Type safety**: Utilize TypeScript to catch potential errors at compile time.
+
+
+
+## Issues and Solutions
+
+### Assembly Display Names
+**Issue**: Get assembly dropdowns friendly names.
+
+**Solution**: Use `assembly.getConf()` method and implement pattern matching for common assemblies:
+
+```typescript
+// Helper function to extract friendly assembly name
+export function getAssemblyDisplayName(assembly: any): string {
+  try {
+    const displayName = assembly.getConf ? assembly.getConf('displayName') : ''
+    const assemblyCode = assembly.getConf ? assembly.getConf('name') : assembly.name
+
+    // Check if displayName is actually different from name (meaning it's a friendly name)
+    if (displayName && String(displayName).trim() !== '' && displayName !== assemblyCode) {
+      return String(displayName)
+    }
+
+    // Look for common assembly patterns and create friendly names
+    const name = String(assemblyCode || assembly.name || '').toLowerCase()
+    
+    if (name.includes('hg19') || name === 'grch37') {
+      return 'Homo sapiens (hg19)'
+    } else if (name.includes('hg38') || name === 'grch38') {
+      return 'Homo sapiens (hg38)'
+    } else if (name.includes('mm10')) {
+      return 'Mus musculus (mm10)'
+    } else if (name.includes('mm39')) {
+      return 'Mus musculus (mm39)'
+    }
+
+    return String(assemblyCode || assembly.name || 'Unknown Assembly')
+  } catch (error) {
+    console.error('Error reading assembly configuration:', error)
+    return String(assembly.name || assembly.id || 'Unknown Assembly')
+  }
+}
+```
+
+**Key Points**:
+- Never access `assembly.displayName` directly - it returns configuration slot objects
+- Use `assembly.getConf('displayName')` to get the actual value
+- Implement fallback patterns for common assembly codes
+- Always handle errors and provide fallbacks

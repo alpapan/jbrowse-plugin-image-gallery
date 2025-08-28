@@ -1,25 +1,93 @@
 import { MenuItem } from '@jbrowse/core/ui'
-import { types } from 'mobx-state-tree'
+import { ConfigurationSchema } from '@jbrowse/core/configuration'
 import { ElementId } from '@jbrowse/core/util/types/mst'
+import { types, Instance } from 'mobx-state-tree'
 import { getSession } from '@jbrowse/core/util'
+import { readConfObject } from '@jbrowse/core/configuration'
+
+// Compatible adapter types for track filtering
+const COMPATIBLE_ADAPTER_TYPES = [
+  'Gff3Adapter',
+  'Gff3TabixAdapter',
+  'GtfAdapter',
+  'BedAdapter',
+  'GeneFeaturesAdapter',
+]
+
+// Helper function to check if adapter type is compatible
+function isCompatibleAdapter(adapterType: string): boolean {
+  return COMPATIBLE_ADAPTER_TYPES.includes(adapterType)
+}
+
+// Helper function to extract friendly assembly name in "Species (code)" format
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getAssemblyDisplayName(assembly: any): string {
+  // Debug logging to understand the actual structure
+  console.log('Assembly object:', assembly)
+
+  try {
+    // Use the getConf method from Assembly API
+    const displayName = assembly.getConf ? assembly.getConf('displayName') : ''
+    const assemblyCode = assembly.getConf
+      ? assembly.getConf('name')
+      : assembly.name
+
+    console.log('Display name:', displayName, 'Assembly code:', assemblyCode)
+
+    // Check if displayName is actually different from name (meaning it's a friendly name)
+    if (
+      displayName &&
+      String(displayName).trim() !== '' &&
+      displayName !== assemblyCode
+    ) {
+      return String(displayName)
+    }
+
+    // If displayName is same as name or empty, try to format it nicely
+    // Look for common assembly patterns and create friendly names
+    const name = String(assemblyCode || assembly.name || '').toLowerCase()
+
+    if (name.includes('hg19') || name === 'grch37') {
+      return 'Homo sapiens (hg19)'
+    } else if (name.includes('hg38') || name === 'grch38') {
+      return 'Homo sapiens (hg38)'
+    } else if (name.includes('mm10')) {
+      return 'Mus musculus (mm10)'
+    } else if (name.includes('mm39')) {
+      return 'Mus musculus (mm39)'
+    }
+
+    // For other assemblies, use the original name
+    return String(assemblyCode || assembly.name || 'Unknown Assembly')
+  } catch (error) {
+    console.error('Error reading assembly configuration:', error)
+  }
+
+  // Fallback to direct property access
+  const displayName = String(assembly.displayName || '')
+  const assemblyCode = String(assembly.name || '')
+
+  if (
+    displayName &&
+    displayName.trim() !== '' &&
+    !displayName.includes('ConfigSlot')
+  ) {
+    return displayName
+  } else if (assemblyCode && assemblyCode.trim() !== '') {
+    return assemblyCode
+  }
+
+  // Final fallback
+  return String(assembly.name || assembly.id || 'Unknown Assembly')
+}
 
 enum FeatureType {
   GENE = 'GENE',
   NON_GENE = 'NON_GENE',
 }
 
-// Helper function to check if adapter type is compatible
-function isCompatibleAdapter(adapterType: string): boolean {
-  return (
-    adapterType === 'Gff3Adapter' ||
-    adapterType === 'GtfAdapter' ||
-    adapterType === 'BedAdapter' ||
-    adapterType === 'GeneFeaturesAdapter'
-  )
-}
-
 const stateModel = types
-  .model({
+  .model('FlexibleTextualDescriptionsView', {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     id: ElementId as any,
     type: types.literal('FlexibleTextualDescriptionsView'),
@@ -195,7 +263,6 @@ const stateModel = types
 
         // Combine both configuration and session assemblies
         const configAssemblies = session.assemblies || []
-        // Use any type for sessionAssemblies as it may not be in type definition
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sessionAssemblies = (session as any).sessionAssemblies || []
         const assemblies = [...configAssemblies, ...sessionAssemblies]
@@ -209,41 +276,133 @@ const stateModel = types
 
     // Get available tracks from session (filtered by assembly and compatibility)
     get availableTracks() {
-      try {
-        // Must have assembly selected first
-        if (!self.selectedAssemblyId) {
-          return []
-        }
+      console.log(
+        'availableTracks called with selectedAssemblyId:',
+        self.selectedAssemblyId,
+      )
 
+      // Must have assembly selected first
+      if (!self.selectedAssemblyId) {
+        console.log('No assembly selected, returning empty tracks array')
+        return []
+      }
+
+      const session = getSession(self)
+      console.log('Session object:', session)
+      console.log('Session tracks:', session?.tracks)
+
+      if (!session?.tracks) {
+        console.log('No session tracks found')
+        return []
+      }
+
+      // Filter tracks by assembly and compatible adapters
+      const filteredTracks = session.tracks.filter(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const session = (self as any).getRoot?.()?.session
-        if (!session?.tracks) {
-          return []
-        }
+        (track: any) => {
+          console.log('Checking track:', track)
+          console.log(
+            'Track properties:',
+            track ? Object.keys(track as Record<string, unknown>) : 'no track',
+          )
 
-        // Filter tracks by assembly and compatible adapters
-        return session.tracks.filter(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (track: any) => {
+          try {
+            // Try multiple ways to access track configuration
+            let trackAssemblyId: string | undefined
+            let adapterType: string | undefined
+
+            // Method 1: Direct getConf method (like assemblies)
+            if (track.getConf) {
+              trackAssemblyId = track.getConf('assemblyId')
+              const adapterConfig = track.getConf('adapter')
+              adapterType = adapterConfig ? adapterConfig.type : undefined
+              console.log('Method 1 - getConf:', {
+                trackAssemblyId,
+                adapterType,
+              })
+            }
+
+            // Method 2: Configuration property with readConfObject
+            if (!trackAssemblyId && track.configuration) {
+              trackAssemblyId = readConfObject(
+                track.configuration,
+                'assemblyId',
+              )
+              const adapterConfig = readConfObject(
+                track.configuration,
+                'adapter',
+              )
+              adapterType = adapterConfig
+                ? readConfObject(adapterConfig, 'type')
+                : undefined
+              console.log('Method 2 - configuration:', {
+                trackAssemblyId,
+                adapterType,
+              })
+            }
+
+            // Method 3: Direct property access
+            if (!trackAssemblyId && track.assemblyId) {
+              trackAssemblyId = track.assemblyId
+              adapterType = track.adapter?.type
+              console.log('Method 3 - direct properties:', {
+                trackAssemblyId,
+                adapterType,
+              })
+            }
+
+            // Method 4: Check if track has assemblyNames property (some tracks use this)
+            if (
+              !trackAssemblyId &&
+              track.assemblyNames &&
+              track.assemblyNames.length > 0
+            ) {
+              trackAssemblyId = track.assemblyNames[0]
+              console.log('Method 4 - assemblyNames:', { trackAssemblyId })
+            }
+
+            console.log('Final track info:', {
+              trackName: track.name || track.trackId,
+              trackAssemblyId,
+              adapterType,
+              selectedAssemblyId: self.selectedAssemblyId,
+            })
+
             // Check if track belongs to selected assembly
-            const trackAssemblyId =
-              track.assemblyId || track.configuration?.assemblyId
-            if (trackAssemblyId !== self.selectedAssemblyId) {
+            if (
+              !trackAssemblyId ||
+              trackAssemblyId !== self.selectedAssemblyId
+            ) {
+              console.log(
+                `Track ${track.name || track.trackId} assembly mismatch or missing: ${trackAssemblyId} !== ${self.selectedAssemblyId}`,
+              )
               return false
             }
 
             // Check if adapter type is compatible
-            const adapterType = track?.configuration?.adapter?.type
-            return (
+            const isCompatible =
               typeof adapterType === 'string' &&
-              isCompatibleAdapter(adapterType)
+              COMPATIBLE_ADAPTER_TYPES.includes(adapterType)
+
+            console.log(
+              `Track ${track.name || track.trackId} adapter compatible:`,
+              isCompatible,
+              'Type:',
+              adapterType,
+              'Compatible types:',
+              COMPATIBLE_ADAPTER_TYPES,
             )
-          },
-        )
-      } catch (error) {
-        console.error('Error getting available tracks:', error)
-        return []
-      }
+
+            return isCompatible
+          } catch (error) {
+            console.error('Error checking track configuration:', error)
+            return false
+          }
+        },
+      )
+
+      console.log('Filtered tracks:', filteredTracks)
+      return filteredTracks
     },
 
     // Get selected assembly object
@@ -253,8 +412,7 @@ const stateModel = types
       }
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const session = (self as any).getRoot?.()?.session
+        const session = getSession(self)
         if (!session) {
           return undefined
         }
@@ -262,7 +420,8 @@ const stateModel = types
         // Check both configuration and session assemblies
         const allAssemblies = [
           ...(session.assemblies || []),
-          ...(session.sessionAssemblies || []),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...((session as any).sessionAssemblies || []),
         ]
 
         return allAssemblies.find(
@@ -284,8 +443,7 @@ const stateModel = types
       }
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const session = (self as any).getRoot?.()?.session
+        const session = getSession(self)
         return session?.tracks?.find(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (track: any) => track.trackId === self.selectedTrackId,
@@ -324,5 +482,6 @@ const stateModel = types
     },
   }))
 
+export type FlexibleTextualDescriptionsViewModel = Instance<typeof stateModel>
 export default stateModel
 export { FeatureType }

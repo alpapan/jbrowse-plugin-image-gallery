@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material'
 import ImageGalleryView from '../../ImageGalleryView/components/ImageGalleryView'
+import { getAssemblyDisplayName } from '../stateModel'
 
 interface FlexibleImageGalleryViewProps {
   model: {
@@ -200,7 +201,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
               </MenuItem>
               {model.availableAssemblies.map(assembly => (
                 <MenuItem key={assembly.name} value={assembly.name}>
-                  {assembly.displayName ?? assembly.name}
+                  {getAssemblyDisplayName(assembly)}
                 </MenuItem>
               ))}
             </Select>
@@ -323,6 +324,8 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
                   featureLabels: model.featureLabels,
                   featureTypes: model.featureTypes,
                   selectedFeatureId: model.selectedFeatureId,
+                  minimized: false,
+                  setMinimized: () => {},
                 }}
               />
             ) : (
@@ -366,9 +369,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
           >
             <Typography variant="body2" color="text.secondary">
               Select a track from the &ldquo;
-              {model.selectedAssembly?.displayName ??
-                model.selectedAssembly?.name ??
-                'selected'}
+              {getAssemblyDisplayName(model.selectedAssembly) || 'selected'}
               &rdquo; assembly to view available features.
             </Typography>
           </Box>

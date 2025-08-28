@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material'
 import { TextualDescriptionsViewF } from '../../TextualDescriptionsView/components/Explainers'
+import { getAssemblyDisplayName } from '../stateModel'
 
 interface FlexibleTextualDescriptionsViewProps {
   model: {
@@ -197,7 +198,7 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
               </MenuItem>
               {model.availableAssemblies.map(assembly => (
                 <MenuItem key={assembly.name} value={assembly.name}>
-                  {assembly.displayName ?? assembly.name}
+                  {getAssemblyDisplayName(assembly)}
                 </MenuItem>
               ))}
             </Select>
@@ -361,9 +362,7 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
           >
             <Typography variant="body2" color="text.secondary">
               Select a track from the &ldquo;
-              {model.selectedAssembly?.displayName ??
-                model.selectedAssembly?.name ??
-                'selected'}
+              {getAssemblyDisplayName(model.selectedAssembly) || 'selected'}
               &rdquo; assembly to view available features.
             </Typography>
           </Box>
