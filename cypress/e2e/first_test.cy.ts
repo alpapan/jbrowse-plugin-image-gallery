@@ -9,7 +9,7 @@ describe('Basic JBrowse and Plugin Test', () => {
     cy.get('body').should('contain.text', 'New Session')
   })
 
-  it('can load JBrowse with ImageGallery plugin configuration', () => {
+  it('can load JBrowse with RichAnnotations plugin configuration', () => {
     cy.fixture('hello_view.json').then(sessionData => {
       cy.writeFile(
         '.jbrowse/hello_view.json',
@@ -25,7 +25,7 @@ describe('Basic JBrowse and Plugin Test', () => {
 
       // Verify the plugin loaded correctly by checking the request succeeded
       cy.request({
-        url: 'http://localhost:9000/dist/jbrowse-plugin-image-gallery-plugin.umd.development.js',
+        url: 'http://localhost:9000/dist/jbrowse-plugin-rich-annotations-plugin.umd.development.js',
         failOnStatusCode: false,
       }).then(response => {
         expect(response.status).to.eq(200)

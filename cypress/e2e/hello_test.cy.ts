@@ -1,6 +1,6 @@
-describe('ImageGallery Plugin Test', () => {
-  it('loads JBrowse with ImageGallery plugin successfully', () => {
-    // Load JBrowse with the ImageGallery plugin configuration
+describe('RichAnnotations Plugin Test', () => {
+  it('loads JBrowse with RichAnnotations plugin successfully', () => {
+    // Load JBrowse with the RichAnnotations plugin configuration
     cy.fixture('hello_view.json').then(sessionData => {
       cy.writeFile(
         '.jbrowse/hello_view.json',
@@ -25,7 +25,7 @@ describe('ImageGallery Plugin Test', () => {
       cy.window().then(win => {
         // Check that the plugin script loaded (no 404 for the plugin file)
         cy.request({
-          url: 'http://localhost:9000/dist/jbrowse-plugin-image-gallery-plugin.umd.development.js',
+          url: 'http://localhost:9000/dist/jbrowse-plugin-rich-annotations-plugin.umd.development.js',
           failOnStatusCode: false,
         }).then(response => {
           expect(response.status).to.eq(200)
@@ -34,7 +34,7 @@ describe('ImageGallery Plugin Test', () => {
     })
   })
 
-  it('verifies ImageGallery plugin is available in the app', () => {
+  it('verifies RichAnnotations plugin is available in the app', () => {
     cy.fixture('hello_view.json').then(sessionData => {
       cy.writeFile(
         '.jbrowse/hello_view.json',
@@ -50,7 +50,7 @@ describe('ImageGallery Plugin Test', () => {
 
       // Verify the plugin loaded by checking its HTTP request was successful
       cy.request({
-        url: 'http://localhost:9000/dist/jbrowse-plugin-image-gallery-plugin.umd.development.js',
+        url: 'http://localhost:9000/dist/jbrowse-plugin-rich-annotations-plugin.umd.development.js',
         failOnStatusCode: false,
       }).then(response => {
         expect(response.status).to.eq(200)

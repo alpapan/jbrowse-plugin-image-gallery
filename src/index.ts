@@ -12,6 +12,14 @@ import {
   ReactComponent as TextualDescriptionsViewReactComponent,
   stateModel as textualDescriptionsViewStateModel,
 } from './TextualDescriptionsView'
+import {
+  ReactComponent as FlexibleTextualDescriptionsViewReactComponent,
+  stateModel as flexibleTextualDescriptionsViewStateModel,
+} from './FlexibleTextualDescriptionsView'
+import {
+  ReactComponent as FlexibleImageGalleryViewReactComponent,
+  stateModel as flexibleImageGalleryViewStateModel,
+} from './FlexibleImageGalleryView'
 
 // Import FeatureType enum for the updateFeature method call
 enum FeatureType {
@@ -19,8 +27,8 @@ enum FeatureType {
   NON_GENE = 'NON_GENE',
 }
 
-export default class ImageGalleryPlugin extends Plugin {
-  name = 'ImageGalleryPlugin'
+export default class RichAnnotationsPlugin extends Plugin {
+  name = 'RichAnnotationsPlugin'
   version = version
   private manuallyClosedViews = new Set<string>()
   private lastSelectedFeatureId: string | undefined = undefined
@@ -43,6 +51,26 @@ export default class ImageGalleryPlugin extends Plugin {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         stateModel: textualDescriptionsViewStateModel as any,
         ReactComponent: TextualDescriptionsViewReactComponent,
+      })
+    })
+
+    // Register FlexibleTextualDescriptionsView
+    pluginManager.addViewType(() => {
+      return new ViewType({
+        name: 'FlexibleTextualDescriptionsView',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        stateModel: flexibleTextualDescriptionsViewStateModel as any,
+        ReactComponent: FlexibleTextualDescriptionsViewReactComponent,
+      })
+    })
+
+    // Register FlexibleImageGalleryView
+    pluginManager.addViewType(() => {
+      return new ViewType({
+        name: 'FlexibleImageGalleryView',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        stateModel: flexibleImageGalleryViewStateModel as any,
+        ReactComponent: FlexibleImageGalleryViewReactComponent,
       })
     })
 
@@ -130,6 +158,20 @@ export default class ImageGalleryPlugin extends Plugin {
         label: 'Textual Descriptions View',
         onClick: (session: AbstractSessionModel) => {
           session.addView('TextualDescriptionsView', {})
+        },
+      })
+
+      pluginManager.rootModel.appendToMenu('Add', {
+        label: 'Flexible Textual Descriptions View',
+        onClick: (session: AbstractSessionModel) => {
+          session.addView('FlexibleTextualDescriptionsView', {})
+        },
+      })
+
+      pluginManager.rootModel.appendToMenu('Add', {
+        label: 'Flexible Image Gallery View',
+        onClick: (session: AbstractSessionModel) => {
+          session.addView('FlexibleImageGalleryView', {})
         },
       })
     }

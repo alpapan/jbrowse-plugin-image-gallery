@@ -2,7 +2,7 @@
 
 ## Description
 
-This document provides comprehensive documentation for all functions in the JBrowse2 Image Gallery Plugin, organized by view type and functionality.
+This document provides comprehensive documentation for all functions in the JBrowse2 Rich Annotations Plugin, organized by view type and functionality.
 
 ## Plugin Overview
 
@@ -138,7 +138,7 @@ The plugin provides two main views for genomic feature visualization:
 
 ## Plugin Registration and Management
 
-### Plugin Class (`ImageGalleryPlugin`)
+### Plugin Class (`RichAnnotationsPlugin`)
 **File**: `src/index.ts`
 **Purpose**: Main plugin class with view registration and management
 **Key Methods**:

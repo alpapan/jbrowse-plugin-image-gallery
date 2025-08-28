@@ -127,3 +127,4 @@ cypress/screenshots
 .vscode
 jbrowse_image.code-workspace
 test.gff3
+.kilo*

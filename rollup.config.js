@@ -33,11 +33,11 @@ processedConfigs.forEach(config => {
     if (Array.isArray(config.output)) {
       config.output.forEach(output => {
         if (output.format === 'umd') {
-          output.name = 'JBrowsePluginImageGalleryPlugin'
+          output.name = 'JBrowsePluginRichAnnotationsPlugin'
         }
       })
     } else if (config.output.format === 'umd') {
-      config.output.name = 'JBrowsePluginImageGalleryPlugin'
+      config.output.name = 'JBrowsePluginRichAnnotationsPlugin'
     }
   }
 })

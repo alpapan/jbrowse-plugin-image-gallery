@@ -1,4 +1,4 @@
-# JBrowse Plugin Image Gallery & Textual Descriptions
+# JBrowse Plugin Rich Annotations
 
 A comprehensive JBrowse 2 plugin that provides two complementary views for displaying feature-associated content:
 
@@ -36,7 +36,7 @@ Add to your JBrowse 2 config.json:
 {
   "plugins": [
     {
-      "name": "ImageGalleryPlugin",
+      "name": "RichAnnotationsPlugin",
       "url": "./jbrowse-plugin-image-gallery.umd.production.min.js"
     }
   ]
@@ -61,10 +61,11 @@ This plugin includes the following key dependencies for enhanced functionality:
 {
   "plugins": [
     {
-      "name": "ImageGalleryPlugin", 
+      "name": "RichAnnotationsPlugin", 
       "url": "/path/to/plugin.js"
     }
   ],
+
   "assemblies": [
     {
       "name": "hg38",
@@ -207,7 +208,7 @@ TextualDescriptionsView supports interactive cytoscape diagrams embedded in mark
 ```cytoscape
 {
   "elements": [
-    { "data": { "id": "gene1", "label": "Gene A" } },
+    { "data": { "id": "gene1", "label": "Gene A"} },
     { "data": { "id": "gene2", "label": "Gene B" } },
     { "data": { "id": "protein1", "label": "Protein X" } },
     { "data": { "source": "gene1", "target": "protein1", "id": "edge1" } },
@@ -231,7 +232,7 @@ TextualDescriptionsView supports interactive cytoscape diagrams embedded in mark
 
 Cytoscape diagrams use JSON format with two main sections:
 
-**Elements Array**: Defines nodes and edges
+**Elements Array**: Defines nodes and edges.
 
 - **Nodes**: `{ "data": { "id": "unique_id", "label": "Display Name" } }`
 - **Edges**: `{ "data": { "source": "node1_id", "target": "node2_id", "id": "edge_id" } }`
@@ -349,7 +350,7 @@ You can add titles and descriptions using square bracket comments at the end of 
 - **Edge Routing**: Orthogonal (right-angled) connections for clarity
 - **Color Scheme**:
   - Species/leaf nodes: Pastel blue (`#A8DADC`)
-  - Internal nodes: Pastel pink (`#F8D7DA`) 
+  - Internal nodes: Pastel pink (`#F8D7DA`)
   - Edges: Gray (`#7F8C8D`)
 - **Interactive**: Zoom and pan enabled for large trees
 - **Responsive**: Adapts to container size

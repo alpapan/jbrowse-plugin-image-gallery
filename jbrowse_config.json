@@ -1,8 +1,8 @@
 {
   "plugins": [
     {
-      "name": "ImageGalleryPlugin",
-      "url": "http://localhost:9000/dist/jbrowse-plugin-image-gallery-plugin.umd.development.js"
+      "name": "RichAnnotationsPlugin",
+      "url": "http://localhost:9000/dist/jbrowse-plugin-rich-annotations-plugin.umd.development.js"
     }
   ],
   "assemblies": [
