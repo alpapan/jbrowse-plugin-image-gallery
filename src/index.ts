@@ -11,7 +11,7 @@ import {
 import {
   ReactComponent as TextualDescriptionsViewReactComponent,
   stateModel as textualDescriptionsViewStateModel,
-} from './TextualDescriptions'
+} from './TextualDescriptionsView'
 
 // Import FeatureType enum for the updateFeature method call
 enum FeatureType {
@@ -98,12 +98,10 @@ export default class ImageGalleryPlugin extends Plugin {
             this.clearImageGalleryView(session)
           }
 
-          // Handle TextualDescriptions view for features with textual content
+          // Handle TextualDescriptionsView view for features with textual content
           if (
             featureSummary &&
             typeof featureSummary === 'object' &&
-            featureSummary.markdown_urls &&
-            featureSummary.markdown_urls !== 'none' &&
             selectedFeature
           ) {
             this.manageTextualDescriptionsView(session, featureSummary)
@@ -241,17 +239,18 @@ export default class ImageGalleryPlugin extends Plugin {
       }
 
       // Update the view with the current feature data
+      // Always call updateFeature to set selectedFeatureId, even if no markdown_urls
       if (textualDescriptionsView?.updateFeature) {
         // Convert arrays to comma-separated strings if needed
         const markdownUrlsString = Array.isArray(featureSummary.markdown_urls)
           ? featureSummary.markdown_urls.join(',')
-          : featureSummary.markdown_urls
+          : featureSummary.markdown_urls || '' // Default to empty string if undefined
         const descriptionsString = Array.isArray(featureSummary.descriptions)
           ? featureSummary.descriptions.join(',')
-          : featureSummary.descriptions
+          : featureSummary.descriptions || '' // Default to empty string if undefined
         const contentTypesString = Array.isArray(featureSummary.content_type)
           ? featureSummary.content_type.join(',')
-          : featureSummary.content_type
+          : featureSummary.content_type || '' // Default to empty string if undefined
 
         textualDescriptionsView.updateFeature(
           featureSummary.id || 'unknown',

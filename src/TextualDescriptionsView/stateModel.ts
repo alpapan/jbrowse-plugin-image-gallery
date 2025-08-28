@@ -7,7 +7,7 @@ enum FeatureType {
   NON_GENE = 'NON_GENE',
 }
 
-export class TextualDescriptionsState {
+export class TextualDescriptionsViewState {
   selectedFeatureId?: string
   selectedFeatureType: FeatureType = FeatureType.NON_GENE
   featureMarkdownUrls = ''
@@ -79,41 +79,49 @@ const stateModel = types
       descriptions?: string,
       contentTypes?: string,
     ) {
-      // Validate input
-      if (!featureId || !markdownUrls) {
+      // Validate input - featureId is required, but markdownUrls can be empty
+      if (!featureId) {
         return
       }
 
-      // Parse comma-separated strings from GFF3 attributes (not JSON)
-      const urlList = markdownUrls
-        ? markdownUrls
-            .split(',')
-            .map(url => url.trim())
-            .filter(url => url.length > 0)
-        : []
-      const descriptionList = descriptions
-        ? descriptions
-            .split(',')
-            .map(desc => desc.trim())
-            .filter(desc => desc.length > 0)
-        : []
-      const typeList = contentTypes
-        ? contentTypes
-            .split(',')
-            .map(type => type.trim())
-            .filter(type => type.length > 0)
-        : []
-
-      // Deduplicate content using the class method
-      const uniqueContent = new TextualDescriptionsState().deduplicateContent(
-        urlList,
-      )
-
+      // Always set the selected feature, even if there are no markdown URLs
       self.selectedFeatureId = featureId
       self.selectedFeatureType = featureType.toString()
-      self.featureMarkdownUrls = uniqueContent.join(',')
-      self.featureDescriptions = descriptionList.join(',')
-      self.featureContentTypes = typeList.join(',')
+
+      // Only process URLs if they exist and are not empty
+      if (markdownUrls && markdownUrls.trim() !== '') {
+        // Parse comma-separated strings from GFF3 attributes (not JSON)
+        const urlList = markdownUrls
+          .split(',')
+          .map(url => url.trim())
+          .filter(url => url.length > 0)
+
+        const descriptionList = descriptions
+          ? descriptions
+              .split(',')
+              .map(desc => desc.trim())
+              .filter(desc => desc.length > 0)
+          : []
+        const typeList = contentTypes
+          ? contentTypes
+              .split(',')
+              .map(type => type.trim())
+              .filter(type => type.length > 0)
+          : []
+
+        // Deduplicate content using the class method
+        const uniqueContent =
+          new TextualDescriptionsViewState().deduplicateContent(urlList)
+
+        self.featureMarkdownUrls = uniqueContent.join(',')
+        self.featureDescriptions = descriptionList.join(',')
+        self.featureContentTypes = typeList.join(',')
+      } else {
+        // Clear content fields if no markdown URLs
+        self.featureMarkdownUrls = undefined
+        self.featureDescriptions = undefined
+        self.featureContentTypes = undefined
+      }
     },
 
     // Clear the current feature

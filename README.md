@@ -7,7 +7,7 @@ A comprehensive JBrowse 2 plugin that provides two complementary views for displ
 
 Both views appear automatically when selecting features with the appropriate data attributes.
 
-<img width="1149" height="1069" alt="image" src="https://github.com/user-attachments/assets/d143551d-769e-448e-8ca4-5f8cec414a34" />
+![Example](https://github.com/user-attachments/assets/d143551d-769e-448e-8ca4-5f8cec414a34) --
 
 ## Installation
 
@@ -51,6 +51,8 @@ This plugin includes the following key dependencies for enhanced functionality:
 - `react-markdown` & `remark-gfm`: Markdown rendering with GitHub Flavored Markdown
 - `react-syntax-highlighter`: Syntax highlighting for code blocks
 - `cytoscape`: Interactive network visualization and diagrams
+- `cytoscape-klay`: Advanced graph layout algorithms for phylogenetic trees
+- `phylojs`: Lightweight phylogenetic tree parsing and visualization
 - `mobx` & `mobx-state-tree`: State management
 
 ## Example Configuration
@@ -98,20 +100,20 @@ This plugin includes the following key dependencies for enhanced functionality:
 ### ImageGalleryView Attributes
 
 #### Required Attributes
-- `image` or `images`: Comma-separated list of image URLs (use one or the other)
+- `image` or `images`: comma-separated list of image URLs (use one or the other)
 
 #### Optional Attributes
-- `image_group`: Comma-separated labels for each image (used as container titles)
-- `image_tag`: Comma-separated types for each image (displayed as chips below images)
+- `image_group`: comma-separated labels for each image (used as container titles)
+- `image_tag`: comma-separated types for each image (displayed as chips below images)
 
 ### TextualDescriptionsView Attributes
 
 #### Required Attributes
-- `markdown_urls` or `markdown_url`: Comma-separated list of markdown document URLs
+- `markdown_urls` or `markdown_url`: comma-separated list of markdown document URLs
 
 #### Optional Attributes
-- `descriptions` or `description`: Comma-separated descriptions for each markdown document
-- `content_type` or `content_types`: Comma-separated content types (e.g., "tutorial", "analysis", "documentation")
+- `descriptions` or `description`: comma-separated descriptions for each markdown document
+- `content_type` or `content_types`: comma-separated content types (e.g., "tutorial", "analysis", "documentation")
 
 ### GFF3 Format Examples
 
@@ -178,6 +180,7 @@ Select any feature with image or markdown data. The appropriate views appear aut
 - **Syntax Highlighting**: Code blocks with language-specific highlighting
 - **Tables**: Responsive table rendering with proper styling
 - **Cytoscape Diagrams**: Interactive network diagrams embedded in markdown
+- **Phylogenetic Trees**: Interactive evolutionary tree visualization from Newick format
 - **Multi-document Support**: Combines multiple markdown files with separators
 - **Error Handling**: Clear error messages for failed content loading
 - **Responsive Design**: Adapts to different screen sizes
@@ -198,6 +201,7 @@ Select any feature with image or markdown data. The appropriate views appear aut
 ### Cytoscape Diagrams
 
 TextualDescriptionsView supports interactive cytoscape diagrams embedded in markdown using fenced code blocks:
+
 
 ````markdown
 ```cytoscape
@@ -228,10 +232,12 @@ TextualDescriptionsView supports interactive cytoscape diagrams embedded in mark
 Cytoscape diagrams use JSON format with two main sections:
 
 **Elements Array**: Defines nodes and edges
+
 - **Nodes**: `{ "data": { "id": "unique_id", "label": "Display Name" } }`
 - **Edges**: `{ "data": { "source": "node1_id", "target": "node2_id", "id": "edge_id" } }`
 
 **Style Array** (optional): Defines visual styling
+
 - **Selectors**: CSS-like selectors to target elements
 - **Style Objects**: Properties like `background-color`, `shape`, `width`, etc.
 
@@ -287,9 +293,111 @@ This pathway shows the relationship between genes and their protein products:
 }
 ```
 
+### Phylogenetic Trees
+
+TextualDescriptionsView supports interactive phylogenetic tree visualization from Newick format embedded in markdown using fenced code blocks:
+
+
+````markdown
+```newick
+((Human:0.1,Chimp:0.2):0.3,(Mouse:0.4,Rat:0.5):0.6); [DR1 Gene Evolution - Phylogenetic relationships across species]
+```
+````
+
+#### Newick Format Specifications
+
+**Basic Newick Syntax**: 
+- Parentheses define internal nodes and groupings
+- Commas separate sibling nodes
+- Semicolon terminates the tree
+- Colons precede branch lengths (optional)
+- Node labels can be included
+
+**Examples of Valid Newick Formats**:
+```
+Simple tree:           (A,B,C);
+With branch lengths:   (A:0.1,B:0.2,C:0.3);  
+Nested groups:         ((A:0.1,B:0.2):0.5,(C:0.3,D:0.4):0.6);
+With internal labels:  ((A,B)AB,(C,D)CD)Root;
+```
+
+#### Metadata Comments
+
+You can add titles and descriptions using square bracket comments at the end of your Newick string:
+
+**Format Options**:
+- `[Title Only]` - Displays just a title
+- `[Title - Description]` - Displays title and description separately
+
+**Examples**:
+````markdown
+```newick
+((Human:0.1,Chimp:0.2):0.3,(Mouse:0.4,Rat:0.5):0.6); [Mammalian Evolution]
+```
+````
+
+````markdown
+```newick  
+(((A:0.1,B:0.2):0.3,C:0.4):0.5,D:0.6); [Gene Family Tree - Evolutionary relationships of orthologous genes]
+```
+````
+
+#### Tree Visualization Features
+
+**Layout and Styling**:
+- **Direction**: Left-to-right horizontal layout for easy reading
+- **Edge Routing**: Orthogonal (right-angled) connections for clarity
+- **Color Scheme**:
+  - Species/leaf nodes: Pastel blue (`#A8DADC`)
+  - Internal nodes: Pastel pink (`#F8D7DA`) 
+  - Edges: Gray (`#7F8C8D`)
+- **Interactive**: Zoom and pan enabled for large trees
+- **Responsive**: Adapts to container size
+
+**Node Display**:
+- Leaf nodes show species/sequence names
+- Internal nodes appear as small circles
+- Branch lengths reflected in layout when provided
+- Automatic label wrapping for long names
+
+#### Complete Phylogenetic Tree Example
+
+````markdown
+# Evolutionary Analysis
+
+The evolutionary relationships of key model organisms:
+
+```newick
+(((Human:0.033,Chimp:0.033):0.014,(Gorilla:0.017,Orangutan:0.022):0.030):0.040,((Mouse:0.084,Rat:0.091):0.271,Rabbit:0.206):0.024); [Model Organisms Phylogeny - Evolutionary distances based on molecular clock analysis]
+```
+
+This tree demonstrates:
+- **Primate clade**: Close relationship between great apes
+- **Rodent clade**: Mouse and rat clustering
+- **Branch lengths**: Proportional to evolutionary time
+- **Outgroup**: Rabbit as more distant mammalian relative
+````
+
+#### Advanced Newick Features
+
+**Complex Trees with Multiple Levels**:
+
+````markdown
+```newick
+((((A1:0.1,A2:0.15)A:0.2,(B1:0.12,B2:0.08)B:0.25)AB:0.3,((C1:0.09,C2:0.11)C:0.18,(D1:0.13,D2:0.07)D:0.22)CD:0.35)ABCD:0.4,E:0.8); [Complex Gene Family - Multi-level phylogenetic analysis with named internal nodes]
+```
+````
+
+**Tips for Creating Newick Trees**:
+1. **Validate format**: Use online Newick validators before embedding
+2. **Branch lengths**: Include if available for accurate proportions
+3. **Node names**: Keep species names concise for better display
+4. **Metadata**: Use descriptive titles and explanations
+5. **Testing**: Preview trees before deployment to check layout
+
 ## Configuration Options
 
-### ImageGalleryView Options
+### ImageGalleryView Options 
 
 | Option              | Default | Description                |
 | ------------------- | ------- | -------------------------- |
@@ -318,9 +426,9 @@ This pathway shows the relationship between genes and their protein products:
 - **Plugin Registration** (`index.ts`): ViewType registration and autorun session monitoring
 
 #### TextualDescriptionsView
-- **State Model** (`TextualDescriptions/stateModel.ts`): MobX state tree with feature and content management
-- **React Component** (`TextualDescriptions/components/Explainers.tsx`): Markdown rendering with cytoscape integration
-- **Plugin Registration** (`index.ts`): ViewType registration and automatic view management
+- **State Model** (`TextualDescriptionsView/stateModel.ts`): MobX state tree with feature and content management
+- **React Component** (`TextualDescriptionsView/components/Explainers.tsx`): Markdown rendering with cytoscape integration
+- **Plugin Registration** (`index.ts`: ViewType registration and automatic view management
 
 ### Data Flow
 
@@ -364,6 +472,7 @@ The `image_tag` attribute provides type labels for images:
 - Custom types: Users can specify any descriptive text (e.g., "before_treatment", "patient_sample", "control_group")
 
 ### Example of Chips Display
+
 ```
 [Image]
 filename.jpg
@@ -391,6 +500,13 @@ filename.jpg
 - Verify all node IDs are unique
 - Ensure edge source/target IDs match existing nodes
 
+### Phylogenetic Trees Not Rendering
+- Ensure Newick format is valid in `newick` code blocks
+- Check browser console for phylo.js-specific errors
+- Verify tree structure is well-formed (balanced parentheses)
+- Ensure semicolon terminates the tree string
+- Check for invalid characters in species names
+
 ### Performance Issues
 - Reduce `maxImages` value for ImageGalleryView
 - Enable `enableLazyLoading` (default: true) for images
@@ -413,4 +529,4 @@ MIT License
 
 ## Author
 
-Alexie Papanicolaou - alpapan@gmail.com
+Alexie Papanicolaou - alpapan@gmail.com.

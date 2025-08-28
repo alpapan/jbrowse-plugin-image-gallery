@@ -46,3 +46,26 @@ Gene Expression Control
 - Cancer research
 - Cell cycle analysis
 - Chromatin remodeling studies
+
+## Evolutionary Analysis
+
+The DR1 gene shows conserved structure across mammalian species, indicating its fundamental importance in transcriptional regulation. Phylogenetic analysis reveals the evolutionary relationships between DR1 orthologs across different species.
+
+
+### Species Relationships
+
+The following represents the evolutionary relationships of DR1 gene across selected mammalian species based on sequence similarity:
+
+```newick
+((Human:0.1,Chimp:0.2):0.3,(Mouse:0.4,Rat:0.5):0.6); [DR1 Gene Evolution - Phylogenetic relationships of DR1 orthologs across mammalian species]
+```
+
+This tree structure demonstrates:
+- **Close relationship** between Human and Chimp DR1 sequences
+- **Rodent clade** showing Mouse and Rat clustering together
+- **Mammalian divergence** patterns consistent with known evolutionary timelines
+
+### Evolutionary Insights
+- High sequence conservation suggests critical functional importance
+- Branch lengths indicate relative evolutionary distances
+- Conserved domains across species support therapeutic targeting potential"

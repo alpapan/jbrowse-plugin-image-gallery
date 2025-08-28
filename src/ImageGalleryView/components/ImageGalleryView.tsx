@@ -74,9 +74,9 @@ interface ImageGalleryViewProps {
   model: {
     selectedFeatureId?: string
     featureImages?: string
-    featureImageLabels?: string
-    featureImageTypes?: string
-    hasImages: boolean
+    featureLabels?: string
+    featureTypes?: string
+    hasContent: boolean
     displayTitle: string
   }
 }
@@ -214,14 +214,14 @@ const LazyImage: React.FC<{
 // Internal ImageGallery component with all functionality
 const ImageGalleryContent = observer(function ImageGalleryContent({
   featureImages,
-  featureImageLabels,
-  featureImageTypes,
+  featureLabels,
+  featureTypes,
   feature,
   config,
 }: {
   featureImages?: string | string[]
-  featureImageLabels?: string
-  featureImageTypes?: string
+  featureLabels?: string
+  featureTypes?: string
   feature?: Feature
   config?: ImageGalleryConfig
 }) {
@@ -273,8 +273,8 @@ const ImageGalleryContent = observer(function ImageGalleryContent({
     }
 
     // Get labels and types from model props first, then feature attributes as fallback
-    const imageLabels = featureImageLabels ?? feature?.get('image_group')
-    const imageTypes = featureImageTypes ?? feature?.get('image_tag')
+    const imageLabels = featureLabels ?? feature?.get('image_group')
+    const imageTypes = featureTypes ?? feature?.get('image_tag')
 
     if (imageUrls.length === 0) {
       return []
@@ -289,14 +289,6 @@ const ImageGalleryContent = observer(function ImageGalleryContent({
     const types = imageTypes
       ? imageTypes.split(',').map((type: string) => type.trim())
       : []
-
-    // console.debug('Final parsing:', {
-    //   limitedUrls,
-    //   labels,
-    //   types,
-    //   imageLabels,
-    //   imageTypes,
-    // })
 
     return limitedUrls.map((url: string, index: number): ImageData => {
       const imageData: ImageData = {
@@ -324,8 +316,8 @@ const ImageGalleryContent = observer(function ImageGalleryContent({
   }, [
     feature,
     featureImages,
-    featureImageLabels,
-    featureImageTypes,
+    featureLabels,
+    featureTypes,
     maxImages,
     validateUrls,
   ])
@@ -544,7 +536,7 @@ const ImageGalleryContent = observer(function ImageGalleryContent({
 const ImageGalleryView = observer(function ImageGalleryView({
   model,
 }: ImageGalleryViewProps) {
-  if (!model.hasImages) {
+  if (!model.hasContent) {
     return (
       <Paper
         elevation={12}
@@ -588,8 +580,8 @@ const ImageGalleryView = observer(function ImageGalleryView({
       {/* Use the merged ImageGalleryContent component */}
       <ImageGalleryContent
         featureImages={model.featureImages}
-        featureImageLabels={model.featureImageLabels}
-        featureImageTypes={model.featureImageTypes}
+        featureLabels={model.featureLabels}
+        featureTypes={model.featureTypes}
         config={{
           maxImages: 10,
           maxImageHeight: 200,
