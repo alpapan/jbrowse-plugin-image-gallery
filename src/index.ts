@@ -1,7 +1,11 @@
 import Plugin from '@jbrowse/core/Plugin'
 import PluginManager from '@jbrowse/core/PluginManager'
 import ViewType from '@jbrowse/core/pluggableElementTypes/ViewType'
-import { AbstractSessionModel, isAbstractMenuManager } from '@jbrowse/core/util'
+import {
+  AbstractSessionModel,
+  isAbstractMenuManager,
+  getSession,
+} from '@jbrowse/core/util'
 import { autorun } from 'mobx'
 import { version } from '../package.json'
 import {
@@ -21,10 +25,57 @@ import {
   stateModel as flexibleImageGalleryViewStateModel,
 } from './FlexibleImageGalleryView'
 
-// Import FeatureType enum for the updateFeature method call
+// Enum for the updateFeature method call
 enum FeatureType {
   GENE = 'GENE',
   NON_GENE = 'NON_GENE',
+}
+
+// Interface for feature summary data
+interface FeatureSummary {
+  id: string
+  type?: string
+  images: string
+  labels: string
+  types: string
+  markdownUrls: string
+  descriptions: string
+  contentTypes: string
+}
+
+// Interface for JBrowse2 Feature-like objects
+interface JBrowseFeature {
+  get(key: string): unknown
+  subfeatures?: () => JBrowseFeature[]
+  children?: () => JBrowseFeature[]
+}
+
+// Interface for ImageGalleryView with its specific methods
+interface ImageGalleryView extends Record<string, unknown> {
+  id: string
+  type: string
+  updateFeature?: (
+    id: string,
+    type: FeatureType,
+    images: string,
+    labels: string,
+    types: string,
+  ) => void
+  clearFeature?: () => void
+}
+
+// Interface for TextualDescriptionsView with its specific methods
+interface TextualDescriptionsView extends Record<string, unknown> {
+  id: string
+  type: string
+  updateFeature?: (
+    id: string,
+    type: FeatureType,
+    markdownUrls: string,
+    descriptions: string,
+    contentTypes: string,
+  ) => void
+  clearFeature?: () => void
 }
 
 export default class RichAnnotationsPlugin extends Plugin {
@@ -80,33 +131,36 @@ export default class RichAnnotationsPlugin extends Plugin {
       autorun(() => {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const session: any = pluginManager.rootModel?.session
+          const session: AbstractSessionModel = getSession(
+            pluginManager.rootModel,
+          )
 
           const sel = session?.selection
           let featureSummary = undefined
           let selectedFeature = undefined
           if (sel) {
             // try common shapes
-            const f = sel.feature ?? sel
-            selectedFeature = f
-            if (f && typeof f.get === 'function') {
+            const f = (sel as unknown as Record<string, unknown>).feature ?? sel
+            selectedFeature = f as unknown as JBrowseFeature
+            const feature = f as unknown as JBrowseFeature
+            if (feature && typeof feature.get === 'function') {
               // Collect images from the main feature and all subfeatures
               const aggregatedImageData =
-                this.collectImagesFromFeatureAndSubfeatures(f)
+                this.collectImagesFromFeatureAndSubfeatures(feature)
 
               // Collect textual content from the main feature and all subfeatures
               const aggregatedTextualData =
-                this.collectTextualContentFromFeatureAndSubfeatures(f)
+                this.collectTextualContentFromFeatureAndSubfeatures(feature)
 
               featureSummary = {
-                id: f.get('id'),
-                type: f.get('type'), // Add type property for FeatureType determination
+                id: String(feature.get('id') ?? ''),
+                type: String(feature.get('type') ?? ''), // Add type property for FeatureType determination
                 images: aggregatedImageData.images,
-                image_group: aggregatedImageData.labels,
-                image_tag: aggregatedImageData.types,
-                markdown_urls: aggregatedTextualData.markdownUrls,
+                labels: aggregatedImageData.labels,
+                types: aggregatedImageData.types,
+                markdownUrls: aggregatedTextualData.markdownUrls,
                 descriptions: aggregatedTextualData.descriptions,
-                content_type: aggregatedTextualData.contentTypes,
+                contentTypes: aggregatedTextualData.contentTypes,
               }
             } else {
               featureSummary = String(f)
@@ -183,8 +237,10 @@ export default class RichAnnotationsPlugin extends Plugin {
   }
 
   // Method to manage ImageGalleryView
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private manageImageGalleryView(session: any, featureSummary: any) {
+  private manageImageGalleryView(
+    session: AbstractSessionModel,
+    featureSummary: FeatureSummary,
+  ) {
     try {
       const viewId = 'imageGalleryView'
       const featureKey = `${viewId}-${featureSummary.id}`
@@ -202,11 +258,9 @@ export default class RichAnnotationsPlugin extends Plugin {
 
       // Check if ImageGalleryView already exists
       let imageGalleryView = session?.views
-        ? session.views.find(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (view: any) =>
-              view.type === 'ImageGalleryView' && view.id === viewId,
-          )
+        ? (session.views.find(
+            view => view.type === 'ImageGalleryView' && view.id === viewId,
+          ) as unknown as ImageGalleryView)
         : null
 
       if (!imageGalleryView && session?.addView) {
@@ -215,7 +269,7 @@ export default class RichAnnotationsPlugin extends Plugin {
           imageGalleryView = session.addView('ImageGalleryView', {
             id: viewId,
             displayName: 'Image Gallery',
-          })
+          }) as unknown as ImageGalleryView
         } catch (e) {
           // eslint-disable-next-line no-console
           console.error('Failed to create ImageGalleryView:', e)
@@ -232,18 +286,17 @@ export default class RichAnnotationsPlugin extends Plugin {
         const imagesString = Array.isArray(featureSummary.images)
           ? featureSummary.images.join(',')
           : featureSummary.images
-        const labelsString = Array.isArray(featureSummary.image_group)
-          ? featureSummary.image_group.join(',')
-          : featureSummary.image_group
-        const typesString = Array.isArray(featureSummary.image_tag)
-          ? featureSummary.image_tag.join(',')
-          : featureSummary.image_tag
+        const labelsString = Array.isArray(featureSummary.labels)
+          ? featureSummary.labels.join(',')
+          : featureSummary.labels
+        const typesString = Array.isArray(featureSummary.types)
+          ? featureSummary.types.join(',')
+          : featureSummary.types
 
         // Validate that we still have the same feature (prevent race conditions)
         if (this.lastSelectedFeatureId === featureSummary.id) {
           imageGalleryView.updateFeature(
             featureSummary.id,
-            // Add the missing featureType parameter based on feature type
             featureSummary.type === 'gene'
               ? FeatureType.GENE
               : FeatureType.NON_GENE,
@@ -259,8 +312,10 @@ export default class RichAnnotationsPlugin extends Plugin {
   }
 
   // Method to manage TextualDescriptionsView
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private manageTextualDescriptionsView(session: any, featureSummary: any) {
+  private manageTextualDescriptionsView(
+    session: AbstractSessionModel,
+    featureSummary: FeatureSummary,
+  ) {
     try {
       const viewId = 'textualDescriptionsView'
       const featureKey = `${viewId}-${featureSummary.id}`
@@ -272,11 +327,10 @@ export default class RichAnnotationsPlugin extends Plugin {
 
       // Check if TextualDescriptionsView already exists
       let textualDescriptionsView = session?.views
-        ? session.views.find(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (view: any) =>
+        ? (session.views.find(
+            view =>
               view.type === 'TextualDescriptionsView' && view.id === viewId,
-          )
+          ) as unknown as TextualDescriptionsView)
         : null
 
       if (!textualDescriptionsView && session?.addView) {
@@ -285,7 +339,7 @@ export default class RichAnnotationsPlugin extends Plugin {
           textualDescriptionsView = session.addView('TextualDescriptionsView', {
             id: viewId,
             displayName: 'Textual Descriptions',
-          })
+          }) as unknown as TextualDescriptionsView
         } catch (e) {
           // eslint-disable-next-line no-console
           console.error('Failed to create TextualDescriptionsView:', e)
@@ -296,21 +350,29 @@ export default class RichAnnotationsPlugin extends Plugin {
       // Always call updateFeature to set selectedFeatureId, even if no markdown_urls
       if (textualDescriptionsView?.updateFeature) {
         // Convert arrays to comma-separated strings if needed
-        const markdownUrlsString = Array.isArray(featureSummary.markdown_urls)
-          ? featureSummary.markdown_urls.join(',')
-          : featureSummary.markdown_urls || '' // Default to empty string if undefined
-        const descriptionsString = Array.isArray(featureSummary.descriptions)
+        const markdownUrlsString: string = Array.isArray(
+          featureSummary.markdownUrls,
+        )
+          ? featureSummary.markdownUrls.join(',')
+          : String(featureSummary.markdownUrls || '') // Default to empty string if undefined
+        const descriptionsString: string = Array.isArray(
+          featureSummary.descriptions,
+        )
           ? featureSummary.descriptions.join(',')
-          : featureSummary.descriptions || '' // Default to empty string if undefined
-        const contentTypesString = Array.isArray(featureSummary.content_type)
-          ? featureSummary.content_type.join(',')
-          : featureSummary.content_type || '' // Default to empty string if undefined
+          : String(featureSummary.descriptions || '') // Default to empty string if undefined
+        const contentTypesString: string = Array.isArray(
+          featureSummary.contentTypes,
+        )
+          ? featureSummary.contentTypes.join(',')
+          : String(featureSummary.contentTypes || '') // Default to empty string if undefined
 
         textualDescriptionsView.updateFeature(
           featureSummary.id || 'unknown',
-          featureSummary.type === 'gene'
-            ? FeatureType.GENE
-            : FeatureType.NON_GENE,
+          featureSummary.type
+            ? featureSummary.type === 'gene'
+              ? FeatureType.GENE
+              : FeatureType.NON_GENE
+            : FeatureType.GENE,
           markdownUrlsString,
           descriptionsString,
           contentTypesString,
@@ -322,15 +384,13 @@ export default class RichAnnotationsPlugin extends Plugin {
   }
 
   // Method to clear ImageGalleryView
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private clearImageGalleryView(session: any) {
+  private clearImageGalleryView(session: AbstractSessionModel) {
     try {
       const viewId = 'imageGalleryView'
       if (session?.views) {
         const imageGalleryView = session.views.find(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (view: any) => view.type === 'ImageGalleryView' && view.id === viewId,
-        )
+          view => view.type === 'ImageGalleryView' && view.id === viewId,
+        ) as unknown as ImageGalleryView
         // Atomic clear: Only clear if view exists and has clearFeature method
         if (imageGalleryView?.clearFeature) {
           // Reset last selected feature to ensure clean state
@@ -344,16 +404,13 @@ export default class RichAnnotationsPlugin extends Plugin {
   }
 
   // Method to clear TextualDescriptionsView
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private clearTextualDescriptionsView(session: any) {
+  private clearTextualDescriptionsView(session: AbstractSessionModel) {
     try {
       const viewId = 'textualDescriptionsView'
       if (session?.views) {
         const textualDescriptionsView = session.views.find(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (view: any) =>
-            view.type === 'TextualDescriptionsView' && view.id === viewId,
-        )
+          view => view.type === 'TextualDescriptionsView' && view.id === viewId,
+        ) as unknown as TextualDescriptionsView
         if (textualDescriptionsView?.clearFeature) {
           textualDescriptionsView.clearFeature()
         }
@@ -365,8 +422,7 @@ export default class RichAnnotationsPlugin extends Plugin {
 
   // Method to collect textual content from a feature and all its subfeatures
   private collectTextualContentFromFeatureAndSubfeatures(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    feature: any,
+    feature: JBrowseFeature,
   ): {
     markdownUrls: string
     descriptions: string
@@ -377,8 +433,7 @@ export default class RichAnnotationsPlugin extends Plugin {
     const allContentTypes: string[] = []
 
     // Helper function to extract textual data from a feature
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const extractTextualData = (f: any) => {
+    const extractTextualData = (f: JBrowseFeature) => {
       if (!f || typeof f.get !== 'function') return
 
       const markdownUrls = f.get('markdown_urls') || f.get('markdown_url')
@@ -441,7 +496,6 @@ export default class RichAnnotationsPlugin extends Plugin {
         if (urlList.length > 0) {
           // Add to collections
           allMarkdownUrls.push(...urlList)
-
           // Use actual descriptions if available, otherwise use 'no description'
           if (
             descriptionList.length > 0 &&
@@ -482,21 +536,16 @@ export default class RichAnnotationsPlugin extends Plugin {
         const subfeatures =
           feature.get('subfeatures') || feature.get('children') || []
         if (Array.isArray(subfeatures)) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          subfeatures.forEach((subfeature: any) => {
+          subfeatures.forEach((subfeature: JBrowseFeature) => {
             extractTextualData(subfeature)
           })
         }
 
-        // Also try to get nested features through other possible accessor patterns
-        if (feature.children && typeof feature.children === 'function') {
-          const children = feature.children()
-          if (Array.isArray(children)) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            children.forEach((child: any) => {
-              extractTextualData(child)
-            })
-          }
+        const children = feature.children?.()
+        if (Array.isArray(children)) {
+          children.forEach((child: JBrowseFeature) => {
+            extractTextualData(child)
+          })
         }
       }
     } catch (e) {
@@ -527,10 +576,7 @@ export default class RichAnnotationsPlugin extends Plugin {
   }
 
   // Method to collect images from a feature and all its subfeatures
-  private collectImagesFromFeatureAndSubfeatures(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    feature: any,
-  ): {
+  private collectImagesFromFeatureAndSubfeatures(feature: JBrowseFeature): {
     images: string
     labels: string
     types: string
@@ -540,8 +586,7 @@ export default class RichAnnotationsPlugin extends Plugin {
     const allTypes: string[] = []
 
     // Helper function to extract image data from a feature
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const extractImageData = (f: any) => {
+    const extractImageData = (f: JBrowseFeature) => {
       if (!f || typeof f.get !== 'function') return
 
       const images = f.get('image') || f.get('images')
@@ -629,18 +674,15 @@ export default class RichAnnotationsPlugin extends Plugin {
         const subfeatures =
           feature.get('subfeatures') || feature.get('children') || []
         if (Array.isArray(subfeatures)) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          subfeatures.forEach((subfeature: any) => {
+          subfeatures.forEach((subfeature: JBrowseFeature) => {
             extractImageData(subfeature)
           })
         }
 
-        // Also try to get nested features through other possible accessor patterns
-        if (feature.children && typeof feature.children === 'function') {
-          const children = feature.children()
+        const children = feature.children?.()
+        if (Array.isArray(children)) {
           if (Array.isArray(children)) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            children.forEach((child: any) => {
+            children.forEach((child: JBrowseFeature) => {
               extractImageData(child)
             })
           }

@@ -148,28 +148,21 @@ const stateModel = types
       // Only process images if they exist and are not empty
       if (images && images.trim() !== '') {
         // Parse comma-separated strings from GFF3 attributes (not JSON)
-        const imageList = images
+        const imageUrls = images
           .split(',')
           .map(url => url.trim())
           .filter(url => url.length > 0)
 
         const labelList = labels
-          ? labels
-              .split(',')
-              .map(label => label.trim())
-              .filter(label => label.length > 0)
+          ? labels.split(',').map(label => label.trim())
           : []
-        const typeList = types
-          ? types
-              .split(',')
-              .map(type => type.trim())
-              .filter(type => type.length > 0)
-          : []
+        const typeList = types ? types.split(',').map(type => type.trim()) : []
 
-        // Deduplicate images using the class method
-        const uniqueImages =
-          new FlexibleImageGalleryViewState().deduplicateImages(imageList)
+        // Create instances for deduplication
+        const helper = new FlexibleImageGalleryViewState()
+        const uniqueImages = helper.deduplicateImages(imageUrls)
 
+        // Store processed data
         self.featureImages = uniqueImages.join(',')
         self.featureLabels = labelList.join(',')
         self.featureTypes = typeList.join(',')
@@ -178,14 +171,14 @@ const stateModel = types
       }
     },
 
-    // Clear the current feature content
+    // Clear feature content
     clearFeatureContent() {
-      self.featureImages = undefined
-      self.featureLabels = undefined
-      self.featureTypes = undefined
+      self.featureImages = ''
+      self.featureLabels = ''
+      self.featureTypes = ''
     },
 
-    // Clear all selections
+    // Clear all selections and content
     clearSelections() {
       self.selectedAssemblyId = undefined
       self.selectedTrackId = undefined
@@ -200,34 +193,21 @@ const stateModel = types
       return []
     },
 
-    // Get available assemblies from session by extracting from tracks
+    // Get available assemblies from session with proper error handling
     get availableAssemblies() {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const session = (self as any).getRoot?.()?.session
-        if (!session?.tracks) {
+        if (!session) {
           return []
         }
 
-        // Extract unique assemblies from tracks
-        const assemblyMap = new Map()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        session.tracks.forEach((track: any) => {
-          const assemblyId = track.assemblyId || track.configuration?.assemblyId
-          if (assemblyId && !assemblyMap.has(assemblyId)) {
-            // Try to get assembly name from session assemblies or use assemblyId
-            const assembly =
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              session.assemblies?.find((asm: any) => asm.name === assemblyId) ||
-              session.assemblyManager?.get?.(assemblyId)
-            assemblyMap.set(assemblyId, {
-              name: assemblyId,
-              displayName: assembly?.displayName || assemblyId,
-            })
-          }
-        })
+        // Combine both configuration and session assemblies
+        const configAssemblies = session.assemblies || []
+        const sessionAssemblies = session.sessionAssemblies || []
+        const assemblies = [...configAssemblies, ...sessionAssemblies]
 
-        return Array.from(assemblyMap.values())
+        return assemblies
       } catch (error) {
         console.error('Error getting available assemblies:', error)
         return []
@@ -278,10 +258,30 @@ const stateModel = types
       if (!self.selectedAssemblyId) {
         return undefined
       }
-      return this.availableAssemblies.find(
+
+      try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (assembly: any) => assembly.name === self.selectedAssemblyId,
-      )
+        const session = (self as any).getRoot?.()?.session
+        if (!session) {
+          return undefined
+        }
+
+        // Check both configuration and session assemblies
+        const allAssemblies = [
+          ...(session.assemblies || []),
+          ...(session.sessionAssemblies || []),
+        ]
+
+        return allAssemblies.find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (assembly: any) =>
+            assembly.name === self.selectedAssemblyId ||
+            assembly.configuration?.name === self.selectedAssemblyId,
+        )
+      } catch (error) {
+        console.error('Error getting selected assembly:', error)
+        return undefined
+      }
     },
 
     // Get selected track object
@@ -289,10 +289,18 @@ const stateModel = types
       if (!self.selectedTrackId) {
         return undefined
       }
-      return this.availableTracks.find(
+
+      try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (track: any) => track.trackId === self.selectedTrackId,
-      )
+        const session = (self as any).getRoot?.()?.session
+        return session?.tracks?.find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (track: any) => track.trackId === self.selectedTrackId,
+        )
+      } catch (error) {
+        console.error('Error getting selected track:', error)
+        return undefined
+      }
     },
 
     // Computed properties for easy access
@@ -301,16 +309,12 @@ const stateModel = types
     },
 
     get displayTitle() {
-      if (self.selectedFeatureId) {
-        return `${self.displayName} for ${String(self.selectedFeatureId)}`
-      }
-      if (self.selectedTrackId) {
-        const trackName = this.selectedTrack?.name || self.selectedTrackId
-        return `${self.displayName} - ${trackName}`
-      }
-      return self.displayName
+      return self.selectedFeatureId
+        ? `${self.displayName} for ${String(self.selectedFeatureId)}`
+        : self.displayName || 'Flexible Image Gallery'
     },
 
+    // Selection state helpers for UI
     get canSelectTrack() {
       return !!self.selectedAssemblyId && !self.isLoadingTracks
     },
@@ -320,12 +324,7 @@ const stateModel = types
     },
 
     get isReady() {
-      return (
-        !!self.selectedAssemblyId &&
-        !!self.selectedTrackId &&
-        !!self.selectedFeatureId &&
-        !self.isLoadingFeatures
-      )
+      return !self.isLoadingTracks && !self.isLoadingFeatures
     },
   }))
 

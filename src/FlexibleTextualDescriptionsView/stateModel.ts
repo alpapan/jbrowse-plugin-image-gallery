@@ -7,31 +7,6 @@ enum FeatureType {
   NON_GENE = 'NON_GENE',
 }
 
-export class FlexibleTextualDescriptionsViewState {
-  selectedAssemblyId?: string
-  selectedTrackId?: string
-  selectedFeatureId?: string
-  selectedFeatureType: FeatureType = FeatureType.NON_GENE
-  featureMarkdownUrls = ''
-  featureDescriptions = ''
-  featureContentTypes = ''
-  isLoadingTracks = false
-  isLoadingFeatures = false
-
-  // Add deduplicateContent method
-  deduplicateContent(content: string[]): string[] {
-    const contentMap: Record<string, string> = {}
-
-    // Only deduplicate by URL, not by type
-    for (const item of content) {
-      if (item && !contentMap[item]) {
-        contentMap[item] = item
-      }
-    }
-    return Object.keys(contentMap)
-  }
-}
-
 // Helper function to check if adapter type is compatible
 function isCompatibleAdapter(adapterType: string): boolean {
   return (
@@ -47,17 +22,17 @@ const stateModel = types
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     id: ElementId as any,
     type: types.literal('FlexibleTextualDescriptionsView'),
-    displayName: types.optional(types.string, 'Flexible Text Descriptions'),
+    displayName: types.optional(types.string, 'Flexible Textual Descriptions'),
     minimized: types.optional(types.boolean, false),
     // Assembly, track and feature selection state - order matters!
     selectedAssemblyId: types.maybe(types.string),
     selectedTrackId: types.maybe(types.string),
     selectedFeatureId: types.maybe(types.string),
     selectedFeatureType: types.optional(types.string, 'GENE'),
-    // Content fields inherited from TextualDescriptionsView
-    featureMarkdownUrls: types.maybe(types.string),
+    // Content fields for textual descriptions
     featureDescriptions: types.maybe(types.string),
-    featureContentTypes: types.maybe(types.string),
+    featureLabels: types.maybe(types.string),
+    featureTypes: types.maybe(types.string),
     // Loading states for progressive UI
     isLoadingTracks: types.optional(types.boolean, false),
     isLoadingFeatures: types.optional(types.boolean, false),
@@ -67,6 +42,7 @@ const stateModel = types
     // the view panel
     setWidth() {},
 
+    // Set the display name for the view (required for view renaming)
     setDisplayName(name: string) {
       self.displayName = name
     },
@@ -126,17 +102,17 @@ const stateModel = types
     setSelectedFeature(
       featureId: string | undefined,
       featureType?: FeatureType,
-      markdownUrls?: string,
       descriptions?: string,
-      contentTypes?: string,
+      labels?: string,
+      types?: string,
     ) {
       self.selectedFeatureId = featureId
       if (featureType) {
         self.selectedFeatureType = featureType.toString()
       }
 
-      if (featureId && markdownUrls) {
-        this.updateFeatureContent(markdownUrls, descriptions, contentTypes)
+      if (featureId && descriptions) {
+        this.updateFeatureContent(descriptions, labels, types)
       } else {
         this.clearFeatureContent()
       }
@@ -144,51 +120,40 @@ const stateModel = types
 
     // Update the feature content displayed in this view
     updateFeatureContent(
-      markdownUrls: string,
-      descriptions?: string,
-      contentTypes?: string,
+      descriptions: string,
+      labels?: string,
+      types?: string,
     ) {
-      // Only process URLs if they exist and are not empty
-      if (markdownUrls && markdownUrls.trim() !== '') {
+      // Only process descriptions if they exist and are not empty
+      if (descriptions && descriptions.trim() !== '') {
         // Parse comma-separated strings from GFF3 attributes (not JSON)
-        const urlList = markdownUrls
-          .split(',')
-          .map(url => url.trim())
-          .filter(url => url.length > 0)
-
         const descriptionList = descriptions
-          ? descriptions
-              .split(',')
-              .map(desc => desc.trim())
-              .filter(desc => desc.length > 0)
-          : []
-        const typeList = contentTypes
-          ? contentTypes
-              .split(',')
-              .map(type => type.trim())
-              .filter(type => type.length > 0)
-          : []
+          .split(',')
+          .map(desc => desc.trim())
+          .filter(desc => desc.length > 0)
 
-        // Deduplicate content using the class method
-        const uniqueContent =
-          new FlexibleTextualDescriptionsViewState().deduplicateContent(urlList)
+        const labelList = labels
+          ? labels.split(',').map(label => label.trim())
+          : []
+        const typeList = types ? types.split(',').map(type => type.trim()) : []
 
-        self.featureMarkdownUrls = uniqueContent.join(',')
+        // Store processed data
         self.featureDescriptions = descriptionList.join(',')
-        self.featureContentTypes = typeList.join(',')
+        self.featureLabels = labelList.join(',')
+        self.featureTypes = typeList.join(',')
       } else {
         this.clearFeatureContent()
       }
     },
 
-    // Clear the current feature content
+    // Clear feature content
     clearFeatureContent() {
-      self.featureMarkdownUrls = undefined
-      self.featureDescriptions = undefined
-      self.featureContentTypes = undefined
+      self.featureDescriptions = ''
+      self.featureLabels = ''
+      self.featureTypes = ''
     },
 
-    // Clear all selections
+    // Clear all selections and content
     clearSelections() {
       self.selectedAssemblyId = undefined
       self.selectedTrackId = undefined
@@ -203,34 +168,21 @@ const stateModel = types
       return []
     },
 
-    // Get available assemblies from session by extracting from tracks
+    // Get available assemblies from session with proper error handling
     get availableAssemblies() {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const session = (self as any).getRoot?.()?.session
-        if (!session?.tracks) {
+        if (!session) {
           return []
         }
 
-        // Extract unique assemblies from tracks
-        const assemblyMap = new Map()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        session.tracks.forEach((track: any) => {
-          const assemblyId = track.assemblyId || track.configuration?.assemblyId
-          if (assemblyId && !assemblyMap.has(assemblyId)) {
-            // Try to get assembly name from session assemblies or use assemblyId
-            const assembly =
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              session.assemblies?.find((asm: any) => asm.name === assemblyId) ||
-              session.assemblyManager?.get?.(assemblyId)
-            assemblyMap.set(assemblyId, {
-              name: assemblyId,
-              displayName: assembly?.displayName || assemblyId,
-            })
-          }
-        })
+        // Combine both configuration and session assemblies
+        const configAssemblies = session.assemblies || []
+        const sessionAssemblies = session.sessionAssemblies || []
+        const assemblies = [...configAssemblies, ...sessionAssemblies]
 
-        return Array.from(assemblyMap.values())
+        return assemblies
       } catch (error) {
         console.error('Error getting available assemblies:', error)
         return []
@@ -281,10 +233,30 @@ const stateModel = types
       if (!self.selectedAssemblyId) {
         return undefined
       }
-      return this.availableAssemblies.find(
+
+      try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (assembly: any) => assembly.name === self.selectedAssemblyId,
-      )
+        const session = (self as any).getRoot?.()?.session
+        if (!session) {
+          return undefined
+        }
+
+        // Check both configuration and session assemblies
+        const allAssemblies = [
+          ...(session.assemblies || []),
+          ...(session.sessionAssemblies || []),
+        ]
+
+        return allAssemblies.find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (assembly: any) =>
+            assembly.name === self.selectedAssemblyId ||
+            assembly.configuration?.name === self.selectedAssemblyId,
+        )
+      } catch (error) {
+        console.error('Error getting selected assembly:', error)
+        return undefined
+      }
     },
 
     // Get selected track object
@@ -292,30 +264,34 @@ const stateModel = types
       if (!self.selectedTrackId) {
         return undefined
       }
-      return this.availableTracks.find(
+
+      try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (track: any) => track.trackId === self.selectedTrackId,
-      )
+        const session = (self as any).getRoot?.()?.session
+        return session?.tracks?.find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (track: any) => track.trackId === self.selectedTrackId,
+        )
+      } catch (error) {
+        console.error('Error getting selected track:', error)
+        return undefined
+      }
     },
 
     // Computed properties for easy access
     get hasContent() {
       return !!(
-        self.featureMarkdownUrls && self.featureMarkdownUrls.trim() !== ''
+        self.featureDescriptions && self.featureDescriptions.trim() !== ''
       )
     },
 
     get displayTitle() {
-      if (self.selectedFeatureId) {
-        return `${self.displayName} for ${String(self.selectedFeatureId)}`
-      }
-      if (self.selectedTrackId) {
-        const trackName = this.selectedTrack?.name || self.selectedTrackId
-        return `${self.displayName} - ${trackName}`
-      }
-      return self.displayName
+      return self.selectedFeatureId
+        ? `${self.displayName} for ${String(self.selectedFeatureId)}`
+        : self.displayName || 'Flexible Textual Descriptions'
     },
 
+    // Selection state helpers for UI
     get canSelectTrack() {
       return !!self.selectedAssemblyId && !self.isLoadingTracks
     },
@@ -325,12 +301,7 @@ const stateModel = types
     },
 
     get isReady() {
-      return (
-        !!self.selectedAssemblyId &&
-        !!self.selectedTrackId &&
-        !!self.selectedFeatureId &&
-        !self.isLoadingFeatures
-      )
+      return !self.isLoadingTracks && !self.isLoadingFeatures
     },
   }))
 
