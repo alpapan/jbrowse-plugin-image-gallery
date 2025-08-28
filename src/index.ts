@@ -57,6 +57,7 @@ interface ImageGalleryView extends Record<string, unknown> {
     labels: string,
     types: string,
   ) => void
+  updateFeatureWithoutImages?: (id: string, type: FeatureType) => void
   clearFeature?: () => void
 }
 
@@ -215,8 +216,16 @@ export default class RichAnnotationsPlugin extends Plugin {
             featureSummary.id
           ) {
             this.manageImageGalleryView(session, featureSummary)
+          } else if (
+            featureSummary &&
+            typeof featureSummary === 'object' &&
+            selectedFeature &&
+            featureSummary.id
+          ) {
+            // Feature selected but no images - update view to show selected feature without images
+            this.manageImageGalleryViewWithoutImages(session, featureSummary)
           } else {
-            // Clear view for all other cases: no selection, no images, invalid data, etc.
+            // Clear view for all other cases: no selection, invalid data, etc.
             this.clearImageGalleryView(session)
           }
 
@@ -320,6 +329,40 @@ export default class RichAnnotationsPlugin extends Plugin {
     } catch (e) {
       console.error(
         'RichAnnotationsPlugin: Error managing ImageGalleryView for feature',
+        featureSummary.id,
+        ':',
+        e,
+      )
+    }
+  }
+
+  // Method to manage ImageGalleryView for features without images
+  private manageImageGalleryViewWithoutImages(
+    session: AbstractSessionModel,
+    featureSummary: FeatureSummary,
+  ) {
+    try {
+      const viewId = 'imageGalleryView'
+
+      // Check if ImageGalleryView already exists
+      const imageGalleryView = session?.views
+        ? (session.views.find(
+            view => view.type === 'ImageGalleryView' && view.id === viewId,
+          ) as unknown as ImageGalleryView)
+        : null
+
+      // Only update existing views, don't create new ones for features without images
+      if (imageGalleryView?.updateFeatureWithoutImages && featureSummary.id) {
+        imageGalleryView.updateFeatureWithoutImages(
+          featureSummary.id,
+          featureSummary.type === 'gene'
+            ? FeatureType.GENE
+            : FeatureType.NON_GENE,
+        )
+      }
+    } catch (e) {
+      console.error(
+        'RichAnnotationsPlugin: Error managing ImageGalleryView for feature without images',
         featureSummary.id,
         ':',
         e,

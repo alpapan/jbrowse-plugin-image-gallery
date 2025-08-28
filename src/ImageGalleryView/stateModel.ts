@@ -127,6 +127,20 @@ const stateModel = types
       self.featureLabels = ''
       self.featureTypes = ''
     },
+
+    // Update feature when it has no images but we still want to show it's selected
+    updateFeatureWithoutImages(featureId: string, featureType: FeatureType) {
+      // Validate input
+      if (!featureId) {
+        return
+      }
+
+      self.selectedFeatureId = featureId
+      self.selectedFeatureType = featureType.toString()
+      self.featureImages = '' // Explicitly empty to trigger hasContent = false
+      self.featureLabels = ''
+      self.featureTypes = ''
+    },
   }))
   .views(self => ({
     // unused by this view, but represents of 'view level' menu items

@@ -556,6 +556,10 @@ const ImageGalleryView = observer(function ImageGalleryView({
     model.setMinimized(!model.minimized)
   }
 
+  // Check if we have a selected feature (with or without images)
+  const hasSelectedFeature =
+    model.selectedFeatureId && model.selectedFeatureId.trim() !== ''
+
   if (!model.hasContent) {
     return (
       <Paper
@@ -583,7 +587,9 @@ const ImageGalleryView = observer(function ImageGalleryView({
           <Typography variant="h6" color="textSecondary">
             {model.minimized
               ? model.displayTitle
-              : 'No feature with images selected'}
+              : hasSelectedFeature
+                ? `No images available for ${model.selectedFeatureId}`
+                : 'No feature with images selected'}
           </Typography>
           <IconButton
             size="small"
@@ -604,7 +610,9 @@ const ImageGalleryView = observer(function ImageGalleryView({
             }}
           >
             <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-              When you select a feature with images, they will appear here
+              {hasSelectedFeature
+                ? 'This feature does not have any associated images.'
+                : 'When you select a feature with images, they will appear here'}
             </Typography>
           </Box>
         </Collapse>
