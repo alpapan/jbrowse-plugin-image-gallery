@@ -1,11 +1,7 @@
 import Plugin from '@jbrowse/core/Plugin'
 import PluginManager from '@jbrowse/core/PluginManager'
 import ViewType from '@jbrowse/core/pluggableElementTypes/ViewType'
-import {
-  AbstractSessionModel,
-  isAbstractMenuManager,
-  getSession,
-} from '@jbrowse/core/util'
+import { AbstractSessionModel, isAbstractMenuManager } from '@jbrowse/core/util'
 import { autorun } from 'mobx'
 import { version } from '../package.json'
 import {
@@ -78,6 +74,11 @@ interface TextualDescriptionsView extends Record<string, unknown> {
   clearFeature?: () => void
 }
 
+// Interface for rootModel with session property
+interface RootModelWithSession {
+  session?: AbstractSessionModel
+}
+
 export default class RichAnnotationsPlugin extends Plugin {
   name = 'RichAnnotationsPlugin'
   version = version
@@ -124,16 +125,52 @@ export default class RichAnnotationsPlugin extends Plugin {
         ReactComponent: FlexibleImageGalleryViewReactComponent,
       })
     })
+  }
+
+  configure(pluginManager: PluginManager) {
+    if (isAbstractMenuManager(pluginManager.rootModel)) {
+      pluginManager.rootModel.appendToMenu('Add', {
+        label: 'Image Gallery View',
+        onClick: (session: AbstractSessionModel) => {
+          session.addView('ImageGalleryView', {})
+        },
+      })
+
+      pluginManager.rootModel.appendToMenu('Add', {
+        label: 'Textual Descriptions View',
+        onClick: (session: AbstractSessionModel) => {
+          session.addView('TextualDescriptionsView', {})
+        },
+      })
+
+      pluginManager.rootModel.appendToMenu('Add', {
+        label: 'Flexible Textual Descriptions View',
+        onClick: (session: AbstractSessionModel) => {
+          session.addView('FlexibleTextualDescriptionsView', {})
+        },
+      })
+
+      pluginManager.rootModel.appendToMenu('Add', {
+        label: 'Flexible Image Gallery View',
+        onClick: (session: AbstractSessionModel) => {
+          session.addView('FlexibleImageGalleryView', {})
+        },
+      })
+    }
 
     // autorun to manage both view types based on feature selection
+    // Set up in configure() where session is available
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, no-console
       autorun(() => {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const session: AbstractSessionModel = getSession(
-            pluginManager.rootModel,
-          )
+          // Access session through the rootModel properly
+          const rootModel = pluginManager.rootModel as RootModelWithSession
+          const session: AbstractSessionModel | undefined = rootModel?.session
+
+          if (!session) {
+            // No session available yet, skip processing
+            return
+          }
 
           const sel = session?.selection
           let featureSummary = undefined
@@ -196,43 +233,17 @@ export default class RichAnnotationsPlugin extends Plugin {
             this.clearTextualDescriptionsView(session)
           }
         } catch (e) {
-          // Silent handling of autorun errors to avoid console noise
+          console.error(
+            'RichAnnotationsPlugin: Error in autorun feature selection handler:',
+            e,
+          )
         }
       })
     } catch (e) {
-      // Silent handling of autorun setup errors
-    }
-  }
-
-  configure(pluginManager: PluginManager) {
-    if (isAbstractMenuManager(pluginManager.rootModel)) {
-      pluginManager.rootModel.appendToMenu('Add', {
-        label: 'Image Gallery View',
-        onClick: (session: AbstractSessionModel) => {
-          session.addView('ImageGalleryView', {})
-        },
-      })
-
-      pluginManager.rootModel.appendToMenu('Add', {
-        label: 'Textual Descriptions View',
-        onClick: (session: AbstractSessionModel) => {
-          session.addView('TextualDescriptionsView', {})
-        },
-      })
-
-      pluginManager.rootModel.appendToMenu('Add', {
-        label: 'Flexible Textual Descriptions View',
-        onClick: (session: AbstractSessionModel) => {
-          session.addView('FlexibleTextualDescriptionsView', {})
-        },
-      })
-
-      pluginManager.rootModel.appendToMenu('Add', {
-        label: 'Flexible Image Gallery View',
-        onClick: (session: AbstractSessionModel) => {
-          session.addView('FlexibleImageGalleryView', {})
-        },
-      })
+      console.error(
+        'RichAnnotationsPlugin: Failed to set up autorun for feature selection handling:',
+        e,
+      )
     }
   }
 
@@ -271,8 +282,8 @@ export default class RichAnnotationsPlugin extends Plugin {
             displayName: 'Image Gallery',
           }) as unknown as ImageGalleryView
         } catch (e) {
-          // eslint-disable-next-line no-console
           console.error('Failed to create ImageGalleryView:', e)
+          return // Don't try to update if creation failed
         }
       }
 
@@ -307,7 +318,12 @@ export default class RichAnnotationsPlugin extends Plugin {
         }
       }
     } catch (e) {
-      // Silent handling of view management errors
+      console.error(
+        'RichAnnotationsPlugin: Error managing ImageGalleryView for feature',
+        featureSummary.id,
+        ':',
+        e,
+      )
     }
   }
 
@@ -341,8 +357,8 @@ export default class RichAnnotationsPlugin extends Plugin {
             displayName: 'Textual Descriptions',
           }) as unknown as TextualDescriptionsView
         } catch (e) {
-          // eslint-disable-next-line no-console
           console.error('Failed to create TextualDescriptionsView:', e)
+          return // Don't try to update if creation failed
         }
       }
 
@@ -379,7 +395,12 @@ export default class RichAnnotationsPlugin extends Plugin {
         )
       }
     } catch (e) {
-      // Silent handling of view management errors
+      console.error(
+        'RichAnnotationsPlugin: Error managing TextualDescriptionsView for feature',
+        featureSummary.id,
+        ':',
+        e,
+      )
     }
   }
 
@@ -399,7 +420,10 @@ export default class RichAnnotationsPlugin extends Plugin {
         }
       }
     } catch (e) {
-      // Silent handling of view clearing errors
+      console.error(
+        'RichAnnotationsPlugin: Error clearing ImageGalleryView:',
+        e,
+      )
     }
   }
 
@@ -416,7 +440,10 @@ export default class RichAnnotationsPlugin extends Plugin {
         }
       }
     } catch (e) {
-      // Silent handling of view clearing errors
+      console.error(
+        'RichAnnotationsPlugin: Error clearing TextualDescriptionsView:',
+        e,
+      )
     }
   }
 
@@ -549,7 +576,10 @@ export default class RichAnnotationsPlugin extends Plugin {
         }
       }
     } catch (e) {
-      // Silent handling of subfeature access errors
+      console.error(
+        'RichAnnotationsPlugin: Error accessing subfeatures for textual content collection:',
+        e,
+      )
     }
 
     // Deduplicate content by URL while preserving order
@@ -689,7 +719,10 @@ export default class RichAnnotationsPlugin extends Plugin {
         }
       }
     } catch (e) {
-      // Silent handling of subfeature access errors
+      console.error(
+        'RichAnnotationsPlugin: Error accessing subfeatures for image data collection:',
+        e,
+      )
     }
 
     // Deduplicate images by URL while preserving order

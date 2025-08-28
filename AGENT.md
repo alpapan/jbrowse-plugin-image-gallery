@@ -1,24 +1,23 @@
-# JBrowse2 Plugin Development Guide for AI Agents
+# JBrowse2 Plugin Development API Reference
 
-This comprehensive guide provides AI agents with detailed information about developing plugins for JBrowse2, covering all major APIs, concepts, and best practices.
+This comprehensive guide provides detailed API documentation for developing plugins in JBrowse2, covering all major APIs, methods, properties, and concepts.
 
 ## Table of Contents
 
 1. [JBrowse2 Architecture Overview](#jbrowse2-architecture-overview)
 2. [Plugin Development Fundamentals](#plugin-development-fundamentals)
 3. [Pluggable Elements](#pluggable-elements)
-4. [View Types](#view-types)
-5. [Track Types](#track-types)
-6. [Display Types](#display-types)
-7. [Adapter Types](#adapter-types)
-8. [Renderer Types](#renderer-types)
-9. [Widget Types](#widget-types)
-10. [Session Management](#session-management)
-11. [Configuration System](#configuration-system)
-12. [Extension Points](#extension-points)
-13. [Jexl Expressions](#jexl-expressions)
-14. [Development Workflow](#development-workflow)
-15. [Best Practices](#best-practices)
+4. [View Types API](#view-types-api)
+5. [Track Types API](#track-types-api)
+6. [Display Types API](#display-types-api)
+7. [Adapter Types API](#adapter-types-api)
+8. [Renderer Types API](#renderer-types-api)
+9. [Widget Types API](#widget-types-api)
+10. [Session Management API](#session-management-api)
+11. [Configuration System API](#configuration-system-api)
+12. [Extension Points API](#extension-points-api)
+13. [Jexl Expressions API](#jexl-expressions-api)
+14. [Best Practices](#best-practices)
 
 ## JBrowse2 Architecture Overview
 
@@ -49,26 +48,30 @@ export default class MyPlugin extends Plugin {
 
   install(pluginManager: PluginManager) {
     // Register pluggable elements here
+    // pluginManager methods for registration:
+    // .addViewType(() => new ViewType({ name, stateModel, ReactComponent }))
+    // .addTrackType(() => new TrackType({ name, configSchema, stateModel }))
+    // .addDisplayType(() => new DisplayType({ name, configSchema, stateModel, trackType, viewType, ReactComponent }))
+    // .addAdapterType(() => new AdapterType({ name, configSchema, adapterClass }))
+    // .addRendererType(() => new RendererType({ name, configSchema, ReactComponent, pluginManager }))
+    // .addWidgetType(() => new WidgetType({ name, configSchema, stateModel, ReactComponent }))
+    // .addConnectionType(() => new ConnectionType({ name, configSchema, ConnectionClass, configDefaults }));
+    // .addTextSearchAdapterType(() => new TextSearchAdapterType({ name, AdapterClass, configSchema }));
+    // .addAddTrackWorkflow(() => new AddTrackWorkflowType({ name, displayName, ReactComponent, type }));
   }
 
   configure(pluginManager: PluginManager) {
     // Set up autoruns, Jexl functions, extension points
+    // pluginManager methods for configuration/runtime:
+    // .jexl.addFunction(name: string, func: Function)
+    // .addToExtensionPoint(extensionPointName: string, callback: Function)
+    // .evaluateExtensionPoint(extensionPointName: string, args: unknown, props?: object)
+    // .evaluateAsyncExtensionPoint(extensionPointName: string, args: unknown, props?: object)
+    // .rootModel: Provides access to the root MST model for global state and actions (e.g., app menus)
   }
 }
 ```
 
-### Plugin Template
-
-Use the [jbrowse-plugin-template](https://github.com/GMOD/jbrowse-plugin-template) for new plugins:
-
-```bash
-git clone https://github.com/GMOD/jbrowse-plugin-template.git my-plugin
-cd my-plugin
-yarn install
-yarn setup  # Sets up local JBrowse instance
-yarn start  # Runs plugin in development mode
-yarn browse # Runs JBrowse with plugin loaded
-```
 
 ## Pluggable Elements
 
@@ -86,11 +89,32 @@ Plugins can add various types of pluggable elements to extend JBrowse functional
 8. **Text Search Adapters**: Search functionality
 9. **Add Track Workflows**: Custom track addition processes
 
-## View Types
+## View Types API
 
 Views are high-level containers that can display arbitrary content. They extend the base view functionality.
 
 ### Creating a Custom View
+
+Views extend a base model with the following API:
+
+```typescript
+interface BaseViewModel {
+  // Properties
+  id: ElementId // Unique identifier for the view
+  displayName: types.maybe(types.string) // Display name in the view header
+  minimized: types.literal(false) // Whether the view is minimized
+
+  // Getters
+  menuItems(): MenuItem[] // Array of menu items to display in the view's menu
+
+  // Actions
+  setDisplayName(name: string): void // Sets the display name of the view
+  setWidth(newWidth: number): void // Sets the width of the view in pixels
+  setMinimized(flag: boolean): void // Sets the minimized state of the view
+}
+```
+
+Example of creating a custom view:
 
 ```typescript
 // src/MyCustomView/index.ts
@@ -100,7 +124,7 @@ import { ViewType } from '@jbrowse/core/pluggableElementTypes'
 import { types } from 'mobx-state-tree'
 
 export const configSchema = ConfigurationSchema('MyCustomView', {
-  // Configuration slots
+  // Configuration slots for MyCustomView
 })
 
 export const stateModelFactory = (pluginManager: PluginManager) => {
@@ -135,11 +159,46 @@ pluginManager.addViewType(() => {
 - **SvInspectorView**: Structural variant inspector
 - **SpreadsheetView**: Tabular data view
 
-## Track Types
+## Track Types API
 
 Tracks are high-level concepts that control what data to display and how. They combine adapters, displays, and renderers.
 
 ### Creating a Custom Track
+
+Tracks extend a base model with the following API:
+
+```typescript
+interface BaseTrackModel {
+  // Properties
+  id: ElementId // Unique identifier for the track instance
+  type: types.literal(trackType) // Literal string matching the track type name
+  configuration: AnyConfigurationSchemaType // Configuration reference for the track
+  minimized: types.literal(false) // Whether the track is minimized
+  pinned: types.literal(false) // Whether the track is pinned
+  displays: IArrayType<IAnyType> // Array of display models associated with this track
+
+  // Getters
+  rpcSessionId: any // Identifier for the webworker session (derived from trackId)
+  name: any // Display name of the track
+  textSearchAdapter: any // Text search adapter instance
+  adapterConfig: any // Configuration for the data adapter
+  adapterType: AdapterType // The type of the data adapter
+  viewMenuActions: MenuItem[] // Menu items specific to the track in the view
+  canConfigure: boolean | ConfigurationSchema // Indicates if the track can be configured
+
+  // Methods
+  trackMenuItems(): (MenuDivider | MenuSubHeader | NormalMenuItem | CheckboxMenuItem | RadioMenuItem | SubMenuItem | { ...; })[] // Returns an array of menu items for the track
+
+  // Actions
+  setPinned(flag: boolean): void // Sets the pinned state of the track
+  setMinimized(flag: boolean): void // Sets the minimized state of the track
+  showDisplay(displayId: string, initialSnapshot?: object): void // Shows a specific display by its ID
+  hideDisplay(displayId: string): number // Hides a specific display by its ID, returns number of visible displays remaining
+  replaceDisplay(oldId: string, newId: string, initialSnapshot?: object): void // Replaces an existing display with a new one
+}
+```
+
+Example of creating a custom track:
 
 ```typescript
 // src/MyCustomTrack/index.ts
@@ -180,7 +239,7 @@ pluginManager.addDisplayType(() => {
 })
 ```
 
-## Display Types
+## Display Types API
 
 Displays determine how tracks are rendered in specific views. A single track can have multiple displays for different view types.
 
@@ -213,9 +272,89 @@ pluginManager.addDisplayType(() => {
 })
 ```
 
-## Adapter Types
+## Adapter Types API
 
 Adapters parse data from various formats and sources.
+
+**What is an Adapter:**
+An adapter is a class that fetches and parses data, returning it in a format JBrowse understands. If custom rendering is needed, a custom display and/or renderer may also be required.
+
+### What types of adapters are there:
+
+-   **Feature adapter**: Most common, takes a region (chromosome, start, end) and returns features (genes, reads, variants) within that region. Examples: `BamAdapter`, `VcfAdapter`.
+-   **Regions adapter**: Defines regions in an assembly, returning a list of chromosomes/contigs/scaffolds and their sizes.
+-   **Sequence adapter**: Combination of regions and feature adapter, provides region list and sequence of queried region. Examples: `FastaAdapter`, `TwoBitAdapter`.
+-   **RefName alias adapter**: Returns data about aliases for reference sequence names (e.g., "chr1" for "1").
+-   **Text search adapter**: Searches text search indexes and returns a list of search results.
+
+### Skeleton of a Feature Adapter
+
+Feature adapters typically extend `BaseFeatureDataAdapter` and implement `getRefNames`, `getFeatures`, and `freeResources`.
+
+```typescript
+import { BaseFeatureDataAdapter } from '@jbrowse/core/data_adapters/BaseAdapter'
+import SimpleFeature from '@jbrowse/core/util/simpleFeature'
+import { readConfObject } from '@jbrowse/core/configuration'
+import { ObservableCreate } from '@jbrowse/core/util/rxjs'
+
+class MyAdapter extends BaseFeatureDataAdapter {
+  // Constructor: Receives config object and optionally getSubAdapter for sub-adapters.
+  // Properties defined in the constructor based on config.
+  constructor(config: AnyConfigurationModel, getSubAdapter: (subadapterConfig: AnyConfigurationModel) => BaseAdapter) {
+    super(config)
+    const fileLocation = readConfObject(config, 'fileLocation')
+    // const subadapter = readConfObject(config, 'sequenceAdapter')
+    // const sequenceAdapter = getSubAdapter(subadapter)
+  }
+
+  // getRefNames: (Optional) Returns an array of reference sequence names
+  async getRefNames(): Promise<string[]> {
+    // Example: ['chr1', 'chr2', 'chrM']
+    return ['chr1', 'chr2', 'chr3'] // etc
+  }
+
+  // getFeatures: Returns an RxJS Observable stream of features for a given region.
+  // region: { refName: string, start: number, end: number, originalRefName: string, assemblyName: string }
+  // options: { bpPerPx: number, stopToken?: AbortSignal, statusCallback?: Function, headers?: Record<string, string>, ...renderProps }
+  getFeatures(region: Region, options: Options) {
+    return ObservableCreate(async observer => {
+      try {
+        const { refName, start, end } = region
+        // Custom logic to fetch and parse features
+        // Example: API call, file parsing
+        const response = await fetch(
+          `http://myservice/genes/${refName}/${start}-${end}`,
+          options,
+        )
+        if (response.ok) {
+          const features = await response.json()
+          features.forEach((feature: any) => {
+            observer.next(
+              new SimpleFeature({
+                uniqueId: `${feature.refName}-${feature.start}-${feature.end}`,
+                refName: feature.refName,
+                start: feature.start,
+                end: feature.end,
+                // Add other feature properties here
+              }),
+            )
+          })
+          observer.complete()
+        } else {
+          throw new Error(`${response.status} - ${response.statusText}`)
+        }
+      } catch (e) {
+        observer.error(e)
+      }
+    })
+  }
+
+  // freeResources: (Optional) Used to release resources, typically an empty function.
+  freeResources(region: Region): void {
+    // Implement if manual resource cleanup is needed
+  }
+}
+```
 
 ### Common Adapter Types
 
@@ -247,7 +386,7 @@ pluginManager.addAdapterType(() => {
 })
 ```
 
-## Renderer Types
+## Renderer Types API
 
 Renderers handle the actual drawing of features. They can run in the main thread, web workers, or server-side.
 
@@ -259,6 +398,70 @@ Renderers handle the actual drawing of features. They can run in the main thread
 - **Comparative Renderers**: Draw synteny/contact data
 
 ### Creating a Renderer
+
+Renderers implement a `render` function and may have a `ReactComponent` for custom SVG/Canvas drawing. They often extend `ServerSideRendererType` or `BoxRendererType`.
+
+```typescript
+// Basic Renderer Structure
+interface RenderResult {
+  reactElement: React.ReactElement // React component containing the rendering output
+  imageData?: ImageBitmap // Optional: Image data for OffscreenCanvas
+  height: number
+  width: number
+}
+
+interface RendererProps {
+  features: Map<string, Feature> // Map of features to render
+  layout: { addRect: (featureId: string, leftBp: number, rightBp: number, height: number) => number } // Layout utility for pileup-like displays
+  config: AnyConfigurationModel // Renderer's configuration
+  regions: Region[] // Genomic regions to render
+  bpPerPx: number // Base pairs per pixel (zoom level)
+  height: number
+  width: number
+  highResolutionScaling: number // Scaling factor for high-resolution displays
+  // Additional custom props can be passed via track's renderProps()
+}
+
+class MyRenderer implements ServerSideRendererType {
+  // render: Main function to perform rendering operations.
+  render(props: RendererProps): RenderResult {
+    const { width, height, regions, features } = props
+    if (typeof OffscreenCanvas !== 'undefined') {
+      const canvas = new OffscreenCanvas(width, height)
+      const ctx = canvas.getContext('2d')
+      // Custom drawing logic using ctx
+      ctx.fillStyle = 'red';
+      ctx.fillRect(0, 0, 100, 100);
+      const imageData = canvas.transferToImageBitmap();
+      return {
+        reactElement: React.createElement(this.ReactComponent, { ...props }),
+        imageData,
+        height,
+        width,
+      }
+    } else {
+       // Fallback for non-OffscreenCanvas environments (e.g., Node.js, some browsers)
+       // This would typically involve serializing drawing commands or returning only ReactElement
+       return {
+         reactElement: React.createElement(this.ReactComponent, { ...props }),
+         height,
+         width,
+       }
+    }
+  }
+
+
+  // getFeatures: (Optional) Overrides default feature fetching (e.g., for non-conventional data types like Hi-C).
+  async getFeatures(args: RendererProps & { dataAdapter: BaseAdapter }): Promise<Feature[]> {
+    const { dataAdapter, regions } = args
+    // Custom feature fetching logic, e.g., for Hi-C where features are not standard
+    const features = await dataAdapter.getFeatures(regions[0]).toPromise()
+    return features
+  }
+}
+```
+
+Example of creating a custom renderer:
 
 ```typescript
 export const configSchema = ConfigurationSchema('MyRenderer', {
@@ -278,7 +481,7 @@ pluginManager.addRendererType(() => {
 })
 ```
 
-## Widget Types
+## Widget Types API
 
 Widgets are custom UI panels that can appear in side panels, modals, or drawers.
 
@@ -303,10 +506,20 @@ export function stateModelFactory(pluginManager: PluginManager) {
   return types.model('MyWidget', {
     id: ElementId,
     type: types.literal('MyWidget'),
-    // Widget state
+    // Widget-specific state properties
+    featureData: types.frozen({}), // Example: for a feature detail widget
+    widgetByline: types.optional(types.string, 'Default widget byline'), // Example: custom text
   })
   .actions(self => ({
     // Widget actions
+    setFeatureData(data: any) { self.featureData = data },
+    clearFeatureData() { self.featureData = {} },
+    setWidgetByline(byline: string) { self.widgetByline = byline },
+  }))
+  .views(self => ({
+    // Widget getters
+    get getWidgetByline() { return self.widgetByline },
+    get hasFeatureData() { return Object.keys(self.featureData).length > 0 },
   }))
 }
 
@@ -323,76 +536,64 @@ pluginManager.addWidgetType(() => {
 })
 ```
 
-## Session Management
+## Session Management API
 
 Sessions manage the user's working environment, including views, tracks, and global state.
 
 ### Session Model Structure
 
+A base session model defines the core API for managing application state.
+
 ```typescript
 interface BaseSessionModel {
+  // Properties
   id: string
   name: string
   margin: number
+  // Other properties like is}t}yp}e etc inherited from MobX State Tree
 
-  // Core functionality
-  setSelection(thing: unknown): void
-  clearSelection(): void
-  setHovered(thing: unknown): void
+  // Getters
+  // root: TypeOrStateTreeNodeToStateTreeNode<ROOT_MODEL_TYPE> // The root model of the application
+  // jbrowse: any // Reference to the JBrowse core (e.g., config, pluginManager)
+  // rpcManager: RpcManager // RPC manager for offloading tasks to workers
+  // configuration: Instance<JB_CONFIG_SCHEMA> // The main application configuration
+  // adminMode: boolean // Indicates if in admin mode
+  // textSearchManager: TextSearchManager // Manager for text search operations
+  // assemblies: AssemblyModel[] // Array of assembly models in the session
 
-  // Views management
-  addView(viewType: string, config: any): AbstractViewModel
-  removeView(view: AbstractViewModel): void
-  views: AbstractViewModel[]
+  // Core functionality Actions
+  setSelection(thing: unknown): void // Sets the global selection
+  clearSelection(): void // Clears the global selection
+  setHovered(thing: unknown): void // Sets the globally hovered object
 
-  // Tracks management
-  addTrack(trackConfig: any): TrackModel
-  removeTrack(track: TrackModel): void
-  tracks: TrackModel[]
+  // Views management Actions
+  addView(viewType: string, config: any): AbstractViewModel // Adds a new view of a specific type with configuration
+  removeView(view: AbstractViewModel): void // Removes a specific view from the session
+  views: AbstractViewModel[] // Array of active view models in the session
 
-  // Widgets
-  addWidget(widgetType: string, id: string, config: any): WidgetModel
-  removeWidget(widget: WidgetModel): void
-  showWidget(widget: WidgetModel): void
+  // Tracks management Actions
+  addTrack(trackConfig: any): TrackModel // Adds a new track with configuration
+  removeTrack(track: TrackModel): void // Removes a specific track from the session
+  tracks: TrackModel[] // Array of active track models in the session
 
-  // Configuration
-  configuration: JBrowseConfigModel
-  assemblies: AssemblyModel[]
+  // Widgets management Actions
+  addWidget(widgetType: string, id: string, config: any): WidgetModel // Adds a new widget of a specific type with configuration
+  removeWidget(widget: WidgetModel): void // Removes a specific widget from the session
+  showWidget(widget: WidgetModel): void // Displays a specific widget
 }
 ```
 
 ### Working with Sessions
 
 ```typescript
-// Get current session
+import { getSession } from '@jbrowse/core/util'
+
+// Get current session from any model (e.g., a view or track model)
 const session = getSession(model)
 
-// Add a view
-const view = session.addView('LinearGenomeView', {
-  assembly: 'hg38',
-  loc: 'chr1:1-100000'
-})
-
-// Add a track
-const track = session.addTrack({
-  type: 'VariantTrack',
-  trackId: 'my-vcf',
-  name: 'My VCF',
-  assemblyNames: ['hg38'],
-  adapter: {
-    type: 'VcfAdapter',
-    vcfLocation: { uri: 'data.vcf.gz', locationType: 'UriLocation' }
-  }
-})
-
-// Show a widget
-const widget = session.addWidget('FeatureDetailWidget', 'feature-detail', {
-  feature: selectedFeature
-})
-session.showWidget(widget)
 ```
 
-## Configuration System
+## Configuration System API
 
 JBrowse2 uses a typed configuration system with slots and schemas.
 
@@ -403,16 +604,19 @@ JBrowse2 uses a typed configuration system with slots and schemas.
 - `boolean`: Checkbox
 - `color`: Color picker
 - `stringEnum`: Dropdown selection
-- `fileLocation`: File/URL input
-- `frozen`: Arbitrary JSON
-- `text`: Multi-line text
+- `fileLocation`: File/URL input (e.g., `{ uri: 'path/to/file', locationType: 'UriLocation' }`)
+- `frozen`: Arbitrary JSON data
+- `text`: Multi-line text area
 - `stringArray`: List of strings
-- `stringArrayMap`: Key-value pairs
+- `stringArrayMap`: Key-value pairs (e.g., array of `{ key: string, value: string }` objects)
 
 ### Creating Configuration Schemas
 
+Configuration schemas are created using `ConfigurationSchema` and define the structure and default values for configurable elements.
+
 ```typescript
 import { ConfigurationSchema } from '@jbrowse/core/configuration'
+import { types } from 'mobx-state-tree'
 
 const myConfigSchema = ConfigurationSchema('MyElement', {
   // Simple string slot
@@ -444,7 +648,7 @@ const myConfigSchema = ConfigurationSchema('MyElement', {
     defaultValue: { uri: '', locationType: 'UriLocation' },
   },
 
-  // Sub-schema
+  // Sub-schema for nested configuration
   advanced: ConfigurationSchema('AdvancedOptions', {
     threshold: {
       type: 'number',
@@ -457,60 +661,110 @@ const myConfigSchema = ConfigurationSchema('MyElement', {
 
 ### Reading Configuration Values
 
+Use `readConfObject` to safely access configuration values, including handling default values and Jexl callbacks.
+
 ```typescript
 import { readConfObject } from '@jbrowse/core/configuration'
 
+const config = someConfigurationModel // Assume 'config' is an instance of a ConfigurationSchema
+
 // Read simple value
-const name = readConfObject(config, 'name')
+const name = readConfObject(config, 'name') // e.g., 'My Element'
 
 // Read nested value
-const threshold = readConfObject(config, ['advanced', 'threshold'])
+const threshold = readConfObject(config, ['advanced', 'threshold']) // e.g., 0.5
 
 // Read with context variables (for Jexl callbacks)
-const color = readConfObject(config, 'color', { feature })
+const feature = { type: 'SNV', name: 'mySNP' } // Example context variable
+const color = readConfObject(config, 'color', { feature }) // Evaluates any Jexl expression in 'color' slot using 'feature'
 ```
 
-## Extension Points
+## Extension Points API
 
-Extension points allow plugins to register callbacks that are executed at specific times.
+Extension points allow plugins to register callbacks that are executed at specific times. They are used for adding, overwriting, or modifying functionality within the JBrowse ecosystem.
 
-### Using Extension Points
+### Producer API: Evaluating Extension Points
+
+Components that provide extension points call `evaluateExtensionPoint` or `evaluateAsyncExtensionPoint` to run registered callbacks.
 
 ```typescript
-// Producer: Evaluate extension point
+// Synchronous evaluation
 const result = pluginManager.evaluateExtensionPoint(
-  'MyExtensionPoint',
+  'MyExtensionPoint', // Name of the extension point
+  initialValue,       // Initial value, passed as 'args' to callbacks, mutated across chained callbacks
+  context             // Optional: additional context, passed as 'props' to callbacks, consistent across chain
+)
+
+// Asynchronous evaluation (for operations that might involve Promises)
+const asyncResult = await pluginManager.evaluateAsyncExtensionPoint(
+  'MyAsyncExtensionPoint',
   initialValue,
   context
 )
+```
 
-// Consumer: Register callback
+### Consumer API: Registering Callbacks to Extension Points
+
+Plugins register callback functions to an extension point using `addToExtensionPoint`.
+
+```typescript
 pluginManager.addToExtensionPoint(
-  'MyExtensionPoint',
-  (value, context) => {
-    // Process value
-    return modifiedValue
+  'MyExtensionPoint', // Name of the extension point to add to
+  (value: any, context: any) => {
+    // 'value' is the result from the previous callback (or initialValue for the first)
+    // 'context' is the 'props' object passed by the producer
+    // Process value and/or context
+    const modifiedValue = { ...value, processed: true }
+    return modifiedValue // Return the (potentially modified) value for the next callback in the chain
   }
 )
 ```
 
 ### Common Extension Points
 
-- `Core-extendPluggableElement`: Extend pluggable element models
-- `Core-guessAdapterForLocation`: Infer adapter from file location
-- `Core-guessTrackTypeForLocation`: Infer track type from file location
-- `Core-replaceAbout`: Replace about dialog
-- `Core-extraAboutPanel`: Add about dialog panels
-- `Core-replaceWidget`: Replace widget components
-- `Core-extraFeaturePanel`: Add feature detail panels
-- `LaunchView-LinearGenomeView`: Launch linear genome view
-- `Core-preProcessTrackConfig`: Pre-process track configuration
-
-## Jexl Expressions
+-   `Core-extendPluggableElement`: Extend pluggable element models (e.g., add new MobX State Tree properties or actions).
+-   `Core-guessAdapterForLocation`: Infer an adapter configuration given a file location, used in "Add track" workflows.
+-   `Core-guessTrackTypeForLocation`: Infer a track type given a file location, used in "Add track" workflows.
+-   `Core-extendSession`: Extend the session model itself with new features.
+-   `Core-replaceAbout`: Replace the default "About this track" React component with a custom one.
+    *   `args`: Default `ReactComponent` for the About dialog.
+    *   `props`: `{ session: AbstractSessionModel, config: AnyConfigurationModel }`
+-   `Core-extraAboutPanel`: Add additional panels to the "About this track" dialog.
+    *   Returns an object `{ name: string, Component: React.ReactComponent }`
+    *   `props`: `{ session: AbstractSessionModel, config: AnyConfigurationModel }`
+-   `Core-customizeAbout`: Modify the configuration snapshot (`Record<string, unknown>`) used for the About dialog after `formatAbout` is applied.
+-   `Core-replaceWidget`: Replace the default React component for any widget (side panel, drawer, modal).
+    *   `args`: Default `ReactComponent` of the widget.
+    *   `props`: `{ session: AbstractSessionModel, model: WidgetModel }`
+-   `Core-extraFeaturePanel`: Add additional panels to the Feature Detail Widget.
+    *   Returns an object `{ name: string, Component: React.ReactComponent }`
+    *   `props`: `{ model: BaseFeatureWidget, feature: Record<string, unknown>, session: AbstractSessionModel }`
+-   `Core-preProcessTrackConfig`: Pre-process a track's configuration snapshot before it's used.
+    *   `args`: `SnapshotIn<AnyConfigurationModel>` (copy of current track config).
+    *   Returns a new track config snapshot.
+-   `Core-layoutTree`: Overwrite the layout tree logic for managing detail panel arrangement.
+-   `LaunchView-LinearGenomeView`: Customizes how a `LinearGenomeView` is launched.
+    *   `args`: `{ session: AbstractSessionModel, assembly: string, loc: string, tracks: string[] }`
+-   `LaunchView-CircularView`: Customizes how a `CircularView` is launched.
+    *   `args`: `{ session: AbstractSessionModel, assembly: string, tracks: string[] }`
+-   `LaunchView-SvInspectorView`: Customizes how an `SvInspectorView` is launched.
+    *   `args`: `{ session: AbstractSessionModel, assembly: string, uri: string, fileType?: string }`
+-   `LaunchView-SpreadsheetView`: Customizes how a `SpreadsheetView` is launched.
+    *   `args`: `{ session: AbstractSessionModel, assembly: string, uri: string, fileType?: string }`
+-   `LaunchView-DotplotView`: Customizes how a `DotplotView` is launched.
+    *   `args`: `{ session: AbstractSessionModel, views: { loc: string, assembly: string, tracks?: string[] }[], tracks: string[] }`
+-   `LaunchView-LinearSyntenyView`: Customizes how a `LinearSyntenyView` is launched.
+    *   `args`: `{ session: AbstractSessionModel, views: { loc: string, assembly: string, tracks?: string[] }[], tracks: string[] }`
+-   `LinearGenomeView-TracksContainer`: Allows rendering a custom component as a child of the `LinearGenomeView`'s "TracksContainer".
+    *   `args`: `React.ReactNode[]` (array of rendered React components).
+    *   `props`: `{ model: LinearGenomeViewModel }`
+## Jexl Expressions API
 
 JBrowse2 uses Jexl (JavaScript Expression Language) for dynamic configuration.
 
 ### Jexl in Configuration
+
+Jexl expressions allow configuration values to be dynamically computed based on runtime data (e.g., feature properties, track state).
 
 ```json
 {
@@ -520,7 +774,7 @@ JBrowse2 uses Jexl (JavaScript Expression Language) for dynamic configuration.
       "type": "LinearVariantDisplay",
       "renderer": {
         "type": "SvgFeatureRenderer",
-        "color": "jexl:get(feature, 'type') === 'SNV' ? 'green' : 'red'"
+        "color": "jexl:get(feature, 'type') === 'SNV' ? 'green' : 'red'" // Example Jexl expression
       }
     }
   ]
@@ -529,109 +783,47 @@ JBrowse2 uses Jexl (JavaScript Expression Language) for dynamic configuration.
 
 ### Adding Custom Jexl Functions
 
+Plugins can extend Jexl with custom functions available in configuration.
+
 ```typescript
 // In plugin configure() method
-pluginManager.jexl.addFunction('myFunction', (feature, track) => {
+pluginManager.jexl.addFunction('myFunction', (feature: any, track: any) => {
   // Custom logic
-  return feature.name.toUpperCase()
+  return feature.name.toUpperCase() // Example: Transform feature name
 })
 
-// Use in configuration
-{
-  "color": "jexl:myFunction(feature, track)"
-}
+// Example usage in configuration:
+// {
+//   "color": "jexl:myFunction(feature, track)"
+// }
 ```
-
-## Development Workflow
-
-### Setting Up Development Environment
-
-1. **Clone plugin template**
-   ```bash
-   git clone https://github.com/GMOD/jbrowse-plugin-template.git my-plugin
-   cd my-plugin
-   yarn install
-   ```
-
-2. **Set up JBrowse**
-   ```bash
-   yarn setup
-   ```
-
-3. **Start development**
-   ```bash
-   yarn start  # Plugin development server
-   yarn browse # JBrowse with plugin
-   ```
-
-### Testing
-
-- **Integration Tests**: Use Cypress for end-to-end testing
-- **Unit Tests**: Use Jest for component testing
-- **Manual Testing**: Test in browser with development server
-
-### Building for Production
-
-```bash
-yarn build
-```
-
-### Publishing to NPM
-
-```bash
-yarn publish
-```
-
-### Adding to Plugin Store
-
-1. Fork [jbrowse-plugin-list](https://github.com/GMOD/jbrowse-plugin-list)
-2. Add plugin to `plugins.json`
-3. Submit pull request
 
 ## Best Practices
 
 ### Code Organization
 
-- **Separate concerns**: Keep state models, React components, and configuration separate
-- **Use TypeScript**: Leverage type safety
-- **Follow naming conventions**: Use consistent naming for pluggable elements
-- **Document APIs**: Add JSDoc comments for public APIs
+-   **Separate concerns**: Keep state models, React components, and configuration separate.
+-   **Use TypeScript**: Leverage type safety for robust development.
+-   **Follow naming conventions**: Use consistent naming for pluggable elements.
+-   **Document APIs**: Add JSDoc comments for public APIs, classes, methods, and properties.
 
 ### Performance
 
-- **Use web workers**: For computationally intensive renderers
-- **Implement virtualization**: For large datasets
-- **Optimize re-renders**: Use MobX observers appropriately
-- **Lazy load**: Load heavy components only when needed
+-   **Use web workers**: For computationally intensive renderers and data processing.
+-   **Implement virtualization**: For large datasets to render only visible parts.
+-   **Optimize re-renders**: Use MobX observers appropriately and minimize unnecessary updates.
+-   **Lazy load**: Load heavy components or data only when genuinely needed.
 
 ### Configuration
 
-- **Provide sensible defaults**: Make plugins work out-of-the-box
-- **Use Jexl callbacks**: For dynamic configuration
-- **Validate inputs**: Use configuration schema validation
-- **Document options**: Clear descriptions for all config slots
+-   **Provide sensible defaults**: Make plugins functional out-of-the-box.
+-   **Use Jexl callbacks**: For dynamic configuration based on contextual data.
+-   **Validate inputs**: Use configuration schema validation to prevent invalid settings.
+-   **Document options**: Provide clear descriptions for all configuration slots.
 
 ### Error Handling
 
-- **Graceful degradation**: Handle missing data gracefully
-- **User feedback**: Show loading states and error messages
-- **Logging**: Use console for debugging (remove in production)
-- **Type safety**: Use TypeScript to catch errors at compile time
-
-### Testing
-
-- **Write integration tests**: Test complete user workflows
-- **Mock external APIs**: For reliable testing
-- **Test configuration**: Verify config schemas work correctly
-- **Cross-browser testing**: Test in supported browsers
-
-### Documentation
-
-- **README**: Include setup and usage instructions
-- **Code comments**: Document complex logic
-- **Configuration examples**: Show common use cases
-- **API documentation**: Document public methods
-
-This guide covers the essential concepts and APIs for developing JBrowse2 plugins. For more detailed examples, refer to the [JBrowse2 developer documentation](https://jbrowse.org/jb2/docs/) and existing plugin repositories.</content>
-</details>
-</use_mcp_tool>
+-   **Graceful degradation**: Handle missing data or errors gracefully to maintain application stability.
+-   **User feedback**: Show loading states, error messages, and success notifications.
+-   **Logging**: Use console for debugging during development (remove or reduce verbosity in production).
+-   **Type safety**: Utilize TypeScript to catch potential errors at compile time.
