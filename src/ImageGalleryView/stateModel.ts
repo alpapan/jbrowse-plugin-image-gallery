@@ -116,11 +116,13 @@ const stateModel = types
 
     // Clear the current feature
     clearFeature() {
+      // Set to empty strings instead of undefined to ensure proper UI updates
+      // and force observable state changes that will trigger re-renders
       self.selectedFeatureId = undefined
       self.selectedFeatureType = 'GENE'
-      self.featureImages = undefined
-      self.featureLabels = undefined
-      self.featureTypes = undefined
+      self.featureImages = ''
+      self.featureLabels = ''
+      self.featureTypes = ''
     },
   }))
   .views(self => ({

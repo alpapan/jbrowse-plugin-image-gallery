@@ -119,10 +119,13 @@ export default class RichAnnotationsPlugin extends Plugin {
             typeof featureSummary === 'object' &&
             featureSummary.images &&
             featureSummary.images !== 'none' &&
-            selectedFeature
+            featureSummary.images.trim() !== '' &&
+            selectedFeature &&
+            featureSummary.id
           ) {
             this.manageImageGalleryView(session, featureSummary)
           } else {
+            // Clear view for all other cases: no selection, no images, invalid data, etc.
             this.clearImageGalleryView(session)
           }
 
@@ -130,10 +133,12 @@ export default class RichAnnotationsPlugin extends Plugin {
           if (
             featureSummary &&
             typeof featureSummary === 'object' &&
-            selectedFeature
+            selectedFeature &&
+            featureSummary.id
           ) {
             this.manageTextualDescriptionsView(session, featureSummary)
           } else {
+            // Clear view for all other cases: no selection, invalid data, etc.
             this.clearTextualDescriptionsView(session)
           }
         } catch (e) {
@@ -217,8 +222,12 @@ export default class RichAnnotationsPlugin extends Plugin {
         }
       }
 
-      // Update the view with the current feature data
-      if (imageGalleryView?.updateFeature) {
+      // Atomic update: Ensure we have a view and valid feature data before updating
+      if (
+        imageGalleryView?.updateFeature &&
+        featureSummary.id &&
+        featureSummary.images
+      ) {
         // Convert images array to comma-separated string if needed
         const imagesString = Array.isArray(featureSummary.images)
           ? featureSummary.images.join(',')
@@ -230,16 +239,19 @@ export default class RichAnnotationsPlugin extends Plugin {
           ? featureSummary.image_tag.join(',')
           : featureSummary.image_tag
 
-        imageGalleryView.updateFeature(
-          featureSummary.id || 'unknown',
-          // Add the missing featureType parameter based on feature type
-          featureSummary.type === 'gene'
-            ? FeatureType.GENE
-            : FeatureType.NON_GENE,
-          imagesString,
-          labelsString,
-          typesString,
-        )
+        // Validate that we still have the same feature (prevent race conditions)
+        if (this.lastSelectedFeatureId === featureSummary.id) {
+          imageGalleryView.updateFeature(
+            featureSummary.id,
+            // Add the missing featureType parameter based on feature type
+            featureSummary.type === 'gene'
+              ? FeatureType.GENE
+              : FeatureType.NON_GENE,
+            imagesString,
+            labelsString,
+            typesString,
+          )
+        }
       }
     } catch (e) {
       // Silent handling of view management errors
@@ -319,7 +331,10 @@ export default class RichAnnotationsPlugin extends Plugin {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (view: any) => view.type === 'ImageGalleryView' && view.id === viewId,
         )
+        // Atomic clear: Only clear if view exists and has clearFeature method
         if (imageGalleryView?.clearFeature) {
+          // Reset last selected feature to ensure clean state
+          this.lastSelectedFeatureId = undefined
           imageGalleryView.clearFeature()
         }
       }

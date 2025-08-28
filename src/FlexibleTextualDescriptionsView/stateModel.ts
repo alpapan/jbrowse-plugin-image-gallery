@@ -8,6 +8,7 @@ enum FeatureType {
 }
 
 export class FlexibleTextualDescriptionsViewState {
+  selectedAssemblyId?: string
   selectedTrackId?: string
   selectedFeatureId?: string
   selectedFeatureType: FeatureType = FeatureType.NON_GENE
@@ -31,6 +32,16 @@ export class FlexibleTextualDescriptionsViewState {
   }
 }
 
+// Helper function to check if adapter type is compatible
+function isCompatibleAdapter(adapterType: string): boolean {
+  return (
+    adapterType === 'Gff3Adapter' ||
+    adapterType === 'GtfAdapter' ||
+    adapterType === 'BedAdapter' ||
+    adapterType === 'GeneFeaturesAdapter'
+  )
+}
+
 const stateModel = types
   .model({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,7 +49,8 @@ const stateModel = types
     type: types.literal('FlexibleTextualDescriptionsView'),
     displayName: types.optional(types.string, 'Flexible Text Descriptions'),
     minimized: types.optional(types.boolean, false),
-    // Track and feature selection state
+    // Assembly, track and feature selection state - order matters!
+    selectedAssemblyId: types.maybe(types.string),
     selectedTrackId: types.maybe(types.string),
     selectedFeatureId: types.maybe(types.string),
     selectedFeatureType: types.optional(types.string, 'GENE'),
@@ -55,7 +67,6 @@ const stateModel = types
     // the view panel
     setWidth() {},
 
-    // Set the display name for the view (required for view renaming)
     setDisplayName(name: string) {
       self.displayName = name
     },
@@ -88,7 +99,20 @@ const stateModel = types
       self.isLoadingFeatures = loading
     },
 
-    // Set selected track
+    // Set selected assembly (clears dependent selections)
+    setSelectedAssembly(assemblyId: string | undefined) {
+      self.selectedAssemblyId = assemblyId
+      // Clear dependent selections when assembly changes
+      if (self.selectedTrackId) {
+        self.selectedTrackId = undefined
+      }
+      if (self.selectedFeatureId) {
+        self.selectedFeatureId = undefined
+        this.clearFeatureContent()
+      }
+    },
+
+    // Set selected track (clears dependent selections)
     setSelectedTrack(trackId: string | undefined) {
       self.selectedTrackId = trackId
       // Clear feature selection when track changes
@@ -166,6 +190,7 @@ const stateModel = types
 
     // Clear all selections
     clearSelections() {
+      self.selectedAssemblyId = undefined
       self.selectedTrackId = undefined
       self.selectedFeatureId = undefined
       self.selectedFeatureType = 'GENE'
@@ -178,8 +203,8 @@ const stateModel = types
       return []
     },
 
-    // Get available tracks from session (GFF tracks only)
-    get availableTracks() {
+    // Get available assemblies from session by extracting from tracks
+    get availableAssemblies() {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const session = (self as any).getRoot?.()?.session
@@ -187,17 +212,61 @@ const stateModel = types
           return []
         }
 
-        // Filter for GFF-compatible tracks (those that have features)
+        // Extract unique assemblies from tracks
+        const assemblyMap = new Map()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        session.tracks.forEach((track: any) => {
+          const assemblyId = track.assemblyId || track.configuration?.assemblyId
+          if (assemblyId && !assemblyMap.has(assemblyId)) {
+            // Try to get assembly name from session assemblies or use assemblyId
+            const assembly =
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              session.assemblies?.find((asm: any) => asm.name === assemblyId) ||
+              session.assemblyManager?.get?.(assemblyId)
+            assemblyMap.set(assemblyId, {
+              name: assemblyId,
+              displayName: assembly?.displayName || assemblyId,
+            })
+          }
+        })
+
+        return Array.from(assemblyMap.values())
+      } catch (error) {
+        console.error('Error getting available assemblies:', error)
+        return []
+      }
+    },
+
+    // Get available tracks from session (filtered by assembly and compatibility)
+    get availableTracks() {
+      try {
+        // Must have assembly selected first
+        if (!self.selectedAssemblyId) {
+          return []
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const session = (self as any).getRoot?.()?.session
+        if (!session?.tracks) {
+          return []
+        }
+
+        // Filter tracks by assembly and compatible adapters
         return session.tracks.filter(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (track: any) => {
-            // Look for tracks that have adapters that can provide features
+            // Check if track belongs to selected assembly
+            const trackAssemblyId =
+              track.assemblyId || track.configuration?.assemblyId
+            if (trackAssemblyId !== self.selectedAssemblyId) {
+              return false
+            }
+
+            // Check if adapter type is compatible
             const adapterType = track?.configuration?.adapter?.type
             return (
-              adapterType === 'Gff3Adapter' ||
-              adapterType === 'GtfAdapter' ||
-              adapterType === 'BedAdapter' ||
-              adapterType === 'GeneFeaturesAdapter'
+              typeof adapterType === 'string' &&
+              isCompatibleAdapter(adapterType)
             )
           },
         )
@@ -205,6 +274,17 @@ const stateModel = types
         console.error('Error getting available tracks:', error)
         return []
       }
+    },
+
+    // Get selected assembly object
+    get selectedAssembly() {
+      if (!self.selectedAssemblyId) {
+        return undefined
+      }
+      return this.availableAssemblies.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (assembly: any) => assembly.name === self.selectedAssemblyId,
+      )
     },
 
     // Get selected track object
@@ -236,12 +316,17 @@ const stateModel = types
       return self.displayName
     },
 
+    get canSelectTrack() {
+      return !!self.selectedAssemblyId && !self.isLoadingTracks
+    },
+
     get canSelectFeature() {
       return !!self.selectedTrackId && !self.isLoadingFeatures
     },
 
     get isReady() {
       return (
+        !!self.selectedAssemblyId &&
         !!self.selectedTrackId &&
         !!self.selectedFeatureId &&
         !self.isLoadingFeatures

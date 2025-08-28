@@ -17,8 +17,13 @@ interface FlexibleImageGalleryViewProps {
   model: {
     id: string
     displayTitle: string
+    selectedAssemblyId?: string
     selectedTrackId?: string
     selectedFeatureId?: string
+    availableAssemblies: {
+      name: string
+      displayName?: string
+    }[]
     availableTracks: {
       trackId: string
       name: string
@@ -32,6 +37,10 @@ interface FlexibleImageGalleryViewProps {
       trackId: string
       name: string
     }
+    selectedAssembly?: {
+      name: string
+      displayName?: string
+    }
     hasContent: boolean
     featureImages?: string
     featureLabels?: string
@@ -40,6 +49,7 @@ interface FlexibleImageGalleryViewProps {
     isLoadingFeatures: boolean
     canSelectFeature: boolean
     isReady: boolean
+    setSelectedAssembly: (assemblyId: string | undefined) => void
     setSelectedTrack: (trackId: string | undefined) => void
     setSelectedFeature: (
       featureId: string | undefined,
@@ -139,6 +149,10 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
       }
     }, [features, model])
 
+    const handleAssemblyChange = (assemblyId: string) => {
+      model.setSelectedAssembly(assemblyId ?? undefined)
+    }
+
     const handleTrackChange = (trackId: string) => {
       model.setSelectedTrack(trackId ?? undefined)
     }
@@ -170,6 +184,38 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
           {model.displayTitle}
         </Typography>
 
+        {/* Assembly Selection */}
+        <Box sx={{ mb: 2 }}>
+          <FormControl fullWidth>
+            <InputLabel id="assembly-select-label">Select Assembly</InputLabel>
+            <Select
+              labelId="assembly-select-label"
+              id="assembly-select"
+              value={model.selectedAssemblyId ?? ''}
+              label="Select Assembly"
+              onChange={e => handleAssemblyChange(e.target.value)}
+            >
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
+              {model.availableAssemblies.map(assembly => (
+                <MenuItem key={assembly.name} value={assembly.name}>
+                  {assembly.displayName ?? assembly.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {model.availableAssemblies.length === 0 && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 1, display: 'block' }}
+            >
+              No assemblies available in this session
+            </Typography>
+          )}
+        </Box>
+
         {/* Track Selection */}
         <Box sx={{ mb: 2 }}>
           <FormControl fullWidth>
@@ -180,7 +226,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
               value={model.selectedTrackId ?? ''}
               label="Select Track"
               onChange={e => handleTrackChange(e.target.value)}
-              disabled={model.isLoadingTracks}
+              disabled={!model.selectedAssemblyId || model.isLoadingTracks}
             >
               <MenuItem value="">
                 <em>None</em>
@@ -192,6 +238,24 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
               ))}
             </Select>
           </FormControl>
+          {!model.selectedAssemblyId && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 1, display: 'block' }}
+            >
+              Select an assembly first to view available tracks
+            </Typography>
+          )}
+          {model.selectedAssemblyId && model.availableTracks.length === 0 && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 1, display: 'block' }}
+            >
+              No compatible tracks available for selected assembly
+            </Typography>
+          )}
         </Box>
 
         {/* Feature Selection */}
@@ -285,13 +349,27 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
         )}
 
         {/* Instructions */}
-        {!model.selectedTrackId && (
+        {!model.selectedAssemblyId && (
           <Box
             sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}
           >
             <Typography variant="body2" color="text.secondary">
-              Select a track from the dropdown above to begin browsing features
-              independently of the main JBrowse selection.
+              Select an assembly from the dropdown above to begin browsing
+              tracks and features independently of the main JBrowse selection.
+            </Typography>
+          </Box>
+        )}
+
+        {model.selectedAssemblyId && !model.selectedTrackId && (
+          <Box
+            sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              Select a track from the &ldquo;
+              {model.selectedAssembly?.displayName ??
+                model.selectedAssembly?.name ??
+                'selected'}
+              &rdquo; assembly to view available features.
             </Typography>
           </Box>
         )}

@@ -9,6 +9,13 @@ Both views appear automatically when selecting features with the appropriate dat
 
 ![Example](https://github.com/user-attachments/assets/d143551d-769e-448e-8ca4-5f8cec414a34) --
 
+
+## Testing
+
+If you're testing with the jbrowse plugin suite, this would be the right url to visit after you have
+`yarn start` for jbrowse-web, `npm run start` and `npm run browser` for this plugin:
+`http://localhost:3000/?config=http%3A%2F%2Flocalhost%3A9000%2Fjbrowse_config.json`
+
 ## Installation
 
 ### Method 1: Add Plugin via JBrowse plugin store (not yet)
