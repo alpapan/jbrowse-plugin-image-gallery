@@ -1,18 +1,23 @@
-import React, { useEffect, useState } from 'react'
-import { observer } from 'mobx-react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
-  Alert,
-  Box,
-  CircularProgress,
-  FormControl,
-  InputLabel,
-  MenuItem,
+  Typography,
   Paper,
   Select,
-  Typography,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Box,
+  CircularProgress,
+  Alert,
+  ImageList,
+  ImageListItem,
+  ImageListItemBar,
 } from '@mui/material'
+import { observer } from 'mobx-react'
 import ImageGalleryView from '../../ImageGalleryView/components/ImageGalleryView'
 import { getAssemblyDisplayName } from '../stateModel'
+import { readConfObject } from '@jbrowse/core/configuration'
+import { getSession } from '@jbrowse/core/util'
 
 interface FlexibleImageGalleryViewProps {
   model: {
@@ -50,6 +55,16 @@ interface FlexibleImageGalleryViewProps {
     isLoadingFeatures: boolean
     canSelectFeature: boolean
     isReady: boolean
+    features: {
+      id: string
+      name: string
+      type: string
+      images?: string
+      image_captions?: string
+      image_group?: string
+      image_tag?: string
+      descriptions?: string
+    }[]
     setSelectedAssembly: (assemblyId: string | undefined) => void
     setSelectedTrack: (trackId: string | undefined) => void
     setSelectedFeature: (
@@ -69,86 +84,36 @@ interface FeatureOption {
   name: string
   type: string
   images?: string
+  image_captions?: string
   image_group?: string
   image_tag?: string
+  descriptions?: string
 }
 
 const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps> =
   observer(({ model }) => {
-    const [features, setFeatures] = useState<FeatureOption[]>([])
-    const [loadingFeatures, setLoadingFeatures] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    // Load features when track selection changes
+    // Use features from the model instead of loading them directly
     useEffect(() => {
-      const loadFeatures = async () => {
-        if (!model.selectedTrackId || !model.selectedTrack) {
-          setFeatures([])
-          return
-        }
-
-        setLoadingFeatures(true)
-        setError(null)
-        model.setLoadingFeatures(true)
-
-        try {
-          // Mock feature loading - in a real implementation, this would
-          // fetch features from the selected track's adapter
-          // For now, we'll create some sample features with image data
-          await new Promise(resolve => setTimeout(resolve, 500)) // Simulate loading
-
-          const sampleFeatures: FeatureOption[] = [
-            {
-              id: 'gene1',
-              name: 'Sample Gene 1',
-              type: 'gene',
-              images:
-                'https://example.com/gene1_image1.jpg,https://example.com/gene1_image2.png',
-              image_group: 'Gene Expression,Protein Structure',
-              image_tag: 'expression,structure',
-            },
-            {
-              id: 'gene2',
-              name: 'Sample Gene 2',
-              type: 'gene',
-              images: 'https://example.com/gene2_image1.jpg',
-              image_group: 'Gene Expression',
-              image_tag: 'expression',
-            },
-            {
-              id: 'exon1',
-              name: 'Sample Exon 1',
-              type: 'exon',
-              images: 'https://example.com/exon1_image1.png',
-              image_group: 'Structural',
-              image_tag: 'structure',
-            },
-          ]
-
-          setFeatures(sampleFeatures)
-        } catch (err) {
-          setError(`Failed to load features: ${String(err)}`)
-          setFeatures([])
-        } finally {
-          setLoadingFeatures(false)
-          model.setLoadingFeatures(false)
-        }
+      // Simply use the features from the model - no direct data loading here
+      if (model.selectedTrackId && model.selectedTrack) {
+        // The model will handle loading features through proper JBrowse2 patterns
+        console.log('Track selected, model will handle feature loading')
       }
-
-      void loadFeatures()
-    }, [model.selectedTrackId, model])
+    }, [model, model.selectedTrackId, model.selectedTrack])
 
     // Clear feature selection when features change
     useEffect(() => {
-      if (model.selectedFeatureId && features.length > 0) {
-        const selectedFeatureExists = features.some(
+      if (model.selectedFeatureId && model.features.length > 0) {
+        const selectedFeatureExists = model.features.some(
           f => f.id === model.selectedFeatureId,
         )
         if (!selectedFeatureExists) {
           model.setSelectedFeature(undefined)
         }
       }
-    }, [features, model])
+    }, [model.features, model])
 
     const handleAssemblyChange = (assemblyId: string) => {
       model.setSelectedAssembly(assemblyId ?? undefined)
@@ -159,14 +124,14 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
     }
 
     const handleFeatureChange = (featureId: string) => {
-      const selectedFeature = features.find(f => f.id === featureId)
+      const selectedFeature = model.features.find(f => f.id === featureId)
       if (selectedFeature) {
         model.setSelectedFeature(
           selectedFeature.id,
           selectedFeature.type === 'gene' ? 'GENE' : 'NON_GENE',
           selectedFeature.images,
+          selectedFeature.image_captions,
           selectedFeature.image_group,
-          selectedFeature.image_tag,
         )
       } else {
         model.setSelectedFeature(undefined)
@@ -175,7 +140,6 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
 
     const handleClearSelections = () => {
       model.clearSelections()
-      setFeatures([])
       setError(null)
     }
 
@@ -234,7 +198,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
               </MenuItem>
               {model.availableTracks.map(track => (
                 <MenuItem key={track.trackId} value={track.trackId}>
-                  {track.name ?? track.trackId}
+                  {String(track.name || track.trackId)}
                 </MenuItem>
               ))}
             </Select>
@@ -270,19 +234,19 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
                 value={model.selectedFeatureId ?? ''}
                 label="Select Feature"
                 onChange={e => handleFeatureChange(e.target.value)}
-                disabled={loadingFeatures || !model.canSelectFeature}
+                disabled={model.isLoadingFeatures || !model.canSelectFeature}
               >
                 <MenuItem value="">
                   <em>None</em>
                 </MenuItem>
-                {features.map(feature => (
+                {model.features.map(feature => (
                   <MenuItem key={feature.id} value={feature.id}>
                     {feature.name ?? feature.id} ({feature.type})
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
-            {loadingFeatures && (
+            {model.isLoadingFeatures && (
               <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
                 <CircularProgress size={20} />
               </Box>
@@ -377,7 +341,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
 
         {model.selectedTrackId &&
           !model.selectedFeatureId &&
-          !loadingFeatures && (
+          !model.isLoadingFeatures && (
             <Box
               sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}
             >

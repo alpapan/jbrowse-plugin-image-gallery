@@ -1,11 +1,10 @@
-import { MenuItem } from '@jbrowse/core/ui'
-import { ConfigurationSchema } from '@jbrowse/core/configuration'
 import { ElementId } from '@jbrowse/core/util/types/mst'
-import { types, Instance } from 'mobx-state-tree'
+import { types } from 'mobx-state-tree'
 import { getSession } from '@jbrowse/core/util'
 import { readConfObject } from '@jbrowse/core/configuration'
+import { MenuItem } from '@jbrowse/core/ui'
 
-// Compatible adapter types for track filtering
+// compatible adapter types for track filtering
 const COMPATIBLE_ADAPTER_TYPES = [
   'Gff3Adapter',
   'Gff3TabixAdapter',
@@ -14,7 +13,40 @@ const COMPATIBLE_ADAPTER_TYPES = [
   'GeneFeaturesAdapter',
 ]
 
+// Feature types that can be selected in the view
+export enum FeatureType {
+  GENE = 'GENE',
+  EXON = 'EXON',
+  CDS = 'CDS',
+  TRANSCRIPT = 'TRANSCRIPT',
+  MRNA = 'mRNA',
+  UTR = 'UTR',
+  INTRON = 'INTRON',
+  INTERGENIC = 'INTERGENIC',
+  PSEUDOGENE = 'PSEUDOGENE',
+  LNCRNA = 'lncRNA',
+  MIRNA = 'miRNA',
+  RRNA = 'rRNA',
+  TRNA = 'tRNA',
+  SNCRNA = 'sncRNA',
+  SNORNA = 'snoRNA',
+  SNRNA = 'snRNA',
+  NONCODING = 'noncoding',
+  REGULATORY = 'regulatory',
+  ENHANCER = 'enhancer',
+  PROMOTER = 'promoter',
+  REPEAT = 'repeat',
+  CENTROMERE = 'centromere',
+  TELOMERE = 'telomere',
+  CHROMOSOME = 'chromosome',
+  SCAFFOLD = 'scaffold',
+  CONTIG = 'contig',
+  GAP = 'gap',
+  UNKNOWN = 'unknown',
+}
+
 // Helper function to check if adapter type is compatible
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function isCompatibleAdapter(adapterType: string): boolean {
   return COMPATIBLE_ADAPTER_TYPES.includes(adapterType)
 }
@@ -22,17 +54,12 @@ function isCompatibleAdapter(adapterType: string): boolean {
 // Helper function to extract friendly assembly name in "Species (code)" format
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getAssemblyDisplayName(assembly: any): string {
-  // Debug logging to understand the actual structure
-  console.log('Assembly object:', assembly)
-
   try {
     // Use the getConf method from Assembly API
     const displayName = assembly.getConf ? assembly.getConf('displayName') : ''
     const assemblyCode = assembly.getConf
       ? assembly.getConf('name')
       : assembly.name
-
-    console.log('Display name:', displayName, 'Assembly code:', assemblyCode)
 
     // Check if displayName is actually different from name (meaning it's a friendly name)
     if (
@@ -61,37 +88,17 @@ export function getAssemblyDisplayName(assembly: any): string {
     return String(assemblyCode || assembly.name || 'Unknown Assembly')
   } catch (error) {
     console.error('Error reading assembly configuration:', error)
+    return String(assembly.name || assembly.id || 'Unknown Assembly')
   }
-
-  // Fallback to direct property access
-  const displayName = String(assembly.displayName || '')
-  const assemblyCode = String(assembly.name || '')
-
-  if (
-    displayName &&
-    displayName.trim() !== '' &&
-    !displayName.includes('ConfigSlot')
-  ) {
-    return displayName
-  } else if (assemblyCode && assemblyCode.trim() !== '') {
-    return assemblyCode
-  }
-
-  // Final fallback
-  return String(assembly.name || assembly.id || 'Unknown Assembly')
 }
 
-enum FeatureType {
-  GENE = 'GENE',
-  NON_GENE = 'NON_GENE',
-}
-
-const stateModel = types
-  .model('FlexibleTextualDescriptionsView', {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const stateModel: any = types
+  .model({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     id: ElementId as any,
     type: types.literal('FlexibleTextualDescriptionsView'),
-    displayName: types.optional(types.string, 'Flexible Textual Descriptions'),
+    displayName: types.optional(types.string, 'Flexible Text Descriptions'),
     minimized: types.optional(types.boolean, false),
     // Assembly, track and feature selection state - order matters!
     selectedAssemblyId: types.maybe(types.string),
@@ -99,13 +106,16 @@ const stateModel = types
     selectedFeatureId: types.maybe(types.string),
     selectedFeatureType: types.optional(types.string, 'GENE'),
     // Content fields for textual descriptions
-    featureDescriptions: types.maybe(types.string),
-    featureLabels: types.maybe(types.string),
-    featureTypes: types.maybe(types.string),
     featureMarkdownUrls: types.maybe(types.string),
+    featureDescriptions: types.maybe(types.string),
+    featureContentTypes: types.maybe(types.string),
     // Loading states for progressive UI
     isLoadingTracks: types.optional(types.boolean, false),
     isLoadingFeatures: types.optional(types.boolean, false),
+    // Text search state management
+    searchTerm: types.optional(types.string, ''),
+    searchResults: types.optional(types.array(types.frozen()), []),
+    isSearching: types.optional(types.boolean, false),
   })
   .actions(self => ({
     // unused by this view but it is updated with the current width in pixels of
@@ -147,6 +157,126 @@ const stateModel = types
       self.isLoadingFeatures = loading
     },
 
+    // Text search actions
+    setSearchTerm(term: string) {
+      self.searchTerm = term
+    },
+
+    setSearching(searching: boolean) {
+      self.isSearching = searching
+    },
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setSearchResults(results: any[]) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      self.searchResults = results as any
+    },
+
+    // Perform text search using JBrowse2's text search system
+    searchFeatures(searchTerm: string) {
+      if (
+        !searchTerm.trim() ||
+        !self.selectedAssemblyId ||
+        !self.selectedTrackId
+      ) {
+        self.searchResults.replace([])
+        return
+      }
+
+      try {
+        self.isSearching = true
+        const session = getSession(self)
+
+        // Check if track has text search configured using proper JBrowse2 API
+        const selectedTrack = session?.tracks?.find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (track: any) => track.trackId === self.selectedTrackId,
+        )
+
+        if (!selectedTrack) {
+          console.warn('Selected track not found')
+          self.searchResults.replace([])
+          return
+        }
+
+        // Check if track has text search configured
+        const textSearchConfig = readConfObject(selectedTrack, 'textSearching')
+        if (!textSearchConfig?.textSearchAdapter) {
+          console.warn('Track has no text search adapter configured')
+          self.searchResults.replace([])
+          return
+        }
+
+        // For now, create mock search results to test the UI integration
+        // This would be replaced with actual text search adapter calls
+        const mockResults = [
+          {
+            id: `search_${searchTerm}_1`,
+            name: `Feature matching "${searchTerm}"`,
+            type: 'gene',
+            location: 'chr1:1000-2000',
+            description: `Mock feature for search term: ${searchTerm}`,
+            markdown_urls: '',
+            descriptions: '',
+            content_types: '',
+          },
+        ]
+
+        // Filter and format results for UI display
+        const formattedResults = mockResults
+          .map(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (result: any) => {
+              try {
+                return {
+                  id: result.featureId || result.id || result.name,
+                  name: result.name || result.featureId || result.id,
+                  type: result.type || 'unknown',
+                  location: result.location
+                    ? `${result.location.refName}:${result.location.start}-${result.location.end}`
+                    : result.location || '',
+                  description: result.description || '',
+                  // Textual description-specific attributes
+                  markdown_urls:
+                    result.attributes?.markdown_urls ||
+                    result.markdown_urls ||
+                    '',
+                  descriptions:
+                    result.attributes?.descriptions ||
+                    result.descriptions ||
+                    '',
+                  content_types:
+                    result.attributes?.content_types ||
+                    result.content_types ||
+                    '',
+                  // Store original result for reference
+                  originalResult: result,
+                }
+              } catch (error) {
+                console.error('Error formatting search result:', error)
+                return null
+              }
+            },
+          )
+          .filter(result => result !== null)
+
+        // Set results using MST array replace method
+        self.searchResults.replace(formattedResults)
+      } catch (error) {
+        console.error('Error performing text search:', error)
+        self.searchResults.replace([])
+      } finally {
+        self.isSearching = false
+      }
+    },
+
+    // Clear search state
+    clearSearch() {
+      self.searchTerm = ''
+      self.searchResults.replace([])
+      self.isSearching = false
+    },
+
     // Set selected assembly (clears dependent selections)
     setSelectedAssembly(assemblyId: string | undefined) {
       self.selectedAssemblyId = assemblyId
@@ -158,6 +288,8 @@ const stateModel = types
         self.selectedFeatureId = undefined
         this.clearFeatureContent()
       }
+      // Clear search when assembly changes
+      this.clearSearch()
     },
 
     // Set selected track (clears dependent selections)
@@ -168,6 +300,8 @@ const stateModel = types
         self.selectedFeatureId = undefined
         this.clearFeatureContent()
       }
+      // Clear search when track changes
+      this.clearSearch()
     },
 
     // Set selected feature and update content
@@ -183,8 +317,8 @@ const stateModel = types
         self.selectedFeatureType = featureType.toString()
       }
 
-      if (featureId && (descriptions ?? markdownUrls)) {
-        this.updateFeatureContent(descriptions, markdownUrls, contentTypes)
+      if (featureId && markdownUrls) {
+        this.updateFeatureContent(markdownUrls, descriptions, contentTypes)
       } else {
         this.clearFeatureContent()
       }
@@ -192,50 +326,42 @@ const stateModel = types
 
     // Update the feature content displayed in this view
     updateFeatureContent(
+      markdownUrls: string,
       descriptions?: string,
-      markdownUrls?: string,
       contentTypes?: string,
     ) {
-      // Process descriptions if they exist and are not empty
-      if (descriptions && descriptions.trim() !== '') {
-        // Parse comma-separated strings from GFF3 attributes (not JSON)
-        const descriptionList = descriptions
-          .split(',')
-          .map(desc => desc.trim())
-          .filter(desc => desc.length > 0)
-
-        self.featureDescriptions = descriptionList.join(',')
-      } else {
-        self.featureDescriptions = ''
-      }
-
-      // Process markdown URLs if they exist and are not empty
+      // Only process URLs if they exist and are not empty
       if (markdownUrls && markdownUrls.trim() !== '') {
+        // Parse comma-separated strings from GFF3 attributes (not JSON)
         const urlList = markdownUrls
           .split(',')
           .map(url => url.trim())
           .filter(url => url.length > 0)
 
-        self.featureMarkdownUrls = urlList.join(',')
-      } else {
-        self.featureMarkdownUrls = ''
-      }
+        const descriptionList = descriptions
+          ? descriptions.split(',').map(desc => desc.trim())
+          : []
+        const typeList = contentTypes
+          ? contentTypes.split(',').map(type => type.trim())
+          : []
 
-      // Process content types if they exist and are not empty
-      if (contentTypes && contentTypes.trim() !== '') {
-        const typeList = contentTypes.split(',').map(type => type.trim())
-        self.featureTypes = typeList.join(',')
+        // Use Set to deduplicate URLs after parsing them
+        const uniqueUrls = Array.from(new Set(urlList))
+
+        // Store processed data
+        self.featureMarkdownUrls = uniqueUrls.join(',')
+        self.featureDescriptions = descriptionList.join(',')
+        self.featureContentTypes = typeList.join(',')
       } else {
-        self.featureTypes = ''
+        this.clearFeatureContent()
       }
     },
 
     // Clear feature content
     clearFeatureContent() {
-      self.featureDescriptions = ''
-      self.featureLabels = ''
-      self.featureTypes = ''
       self.featureMarkdownUrls = ''
+      self.featureDescriptions = ''
+      self.featureContentTypes = ''
     },
 
     // Clear all selections and content
@@ -245,6 +371,7 @@ const stateModel = types
       self.selectedFeatureId = undefined
       self.selectedFeatureType = 'GENE'
       this.clearFeatureContent()
+      this.clearSearch()
     },
   }))
   .views(self => ({
@@ -261,12 +388,8 @@ const stateModel = types
           return []
         }
 
-        // Combine both configuration and session assemblies
-        const configAssemblies = session.assemblies || []
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const sessionAssemblies = (session as any).sessionAssemblies || []
-        const assemblies = [...configAssemblies, ...sessionAssemblies]
-
+        // Use only officially supported session assemblies
+        const assemblies = session.assemblies || []
         return assemblies
       } catch (error) {
         console.error('Error getting available assemblies:', error)
@@ -276,23 +399,14 @@ const stateModel = types
 
     // Get available tracks from session (filtered by assembly and compatibility)
     get availableTracks() {
-      console.log(
-        'availableTracks called with selectedAssemblyId:',
-        self.selectedAssemblyId,
-      )
-
       // Must have assembly selected first
       if (!self.selectedAssemblyId) {
-        console.log('No assembly selected, returning empty tracks array')
         return []
       }
 
       const session = getSession(self)
-      console.log('Session object:', session)
-      console.log('Session tracks:', session?.tracks)
 
       if (!session?.tracks) {
-        console.log('No session tracks found')
         return []
       }
 
@@ -300,82 +414,44 @@ const stateModel = types
       const filteredTracks = session.tracks.filter(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (track: any) => {
-          console.log('Checking track:', track)
-          console.log(
-            'Track properties:',
-            track ? Object.keys(track as Record<string, unknown>) : 'no track',
-          )
-
           try {
-            // Try multiple ways to access track configuration
+            // Use proper JBrowse API - the track itself is a configuration object
             let trackAssemblyId: string | undefined
             let adapterType: string | undefined
 
-            // Method 1: Direct getConf method (like assemblies)
-            if (track.getConf) {
-              trackAssemblyId = track.getConf('assemblyId')
-              const adapterConfig = track.getConf('adapter')
-              adapterType = adapterConfig ? adapterConfig.type : undefined
-              console.log('Method 1 - getConf:', {
-                trackAssemblyId,
-                adapterType,
-              })
-            }
-
-            // Method 2: Configuration property with readConfObject
-            if (!trackAssemblyId && track.configuration) {
-              trackAssemblyId = readConfObject(
-                track.configuration,
-                'assemblyId',
-              )
-              const adapterConfig = readConfObject(
-                track.configuration,
-                'adapter',
-              )
-              adapterType = adapterConfig
-                ? readConfObject(adapterConfig, 'type')
+            // Method 1: Use readConfObject directly on track (proper JBrowse API)
+            try {
+              const assemblyNames = readConfObject(track, 'assemblyNames')
+              trackAssemblyId = Array.isArray(assemblyNames)
+                ? assemblyNames[0]
+                : assemblyNames
+              const adapter = readConfObject(track, 'adapter')
+              adapterType = adapter
+                ? readConfObject(adapter, 'type')
                 : undefined
-              console.log('Method 2 - configuration:', {
-                trackAssemblyId,
-                adapterType,
-              })
+            } catch (e) {
+              // Fallback methods if needed
             }
 
-            // Method 3: Direct property access
-            if (!trackAssemblyId && track.assemblyId) {
-              trackAssemblyId = track.assemblyId
-              adapterType = track.adapter?.type
-              console.log('Method 3 - direct properties:', {
-                trackAssemblyId,
-                adapterType,
-              })
+            // Method 2: Alternative getConf method if track has it
+            if (!trackAssemblyId && typeof track.getConf === 'function') {
+              try {
+                const assemblyNames = track.getConf('assemblyNames')
+                trackAssemblyId = Array.isArray(assemblyNames)
+                  ? assemblyNames[0]
+                  : assemblyNames
+                const adapterConfig = track.getConf('adapter')
+                adapterType = adapterConfig ? adapterConfig.type : undefined
+              } catch (e) {
+                // Continue with what we have
+              }
             }
-
-            // Method 4: Check if track has assemblyNames property (some tracks use this)
-            if (
-              !trackAssemblyId &&
-              track.assemblyNames &&
-              track.assemblyNames.length > 0
-            ) {
-              trackAssemblyId = track.assemblyNames[0]
-              console.log('Method 4 - assemblyNames:', { trackAssemblyId })
-            }
-
-            console.log('Final track info:', {
-              trackName: track.name || track.trackId,
-              trackAssemblyId,
-              adapterType,
-              selectedAssemblyId: self.selectedAssemblyId,
-            })
 
             // Check if track belongs to selected assembly
             if (
               !trackAssemblyId ||
               trackAssemblyId !== self.selectedAssemblyId
             ) {
-              console.log(
-                `Track ${track.name || track.trackId} assembly mismatch or missing: ${trackAssemblyId} !== ${self.selectedAssemblyId}`,
-              )
               return false
             }
 
@@ -383,15 +459,6 @@ const stateModel = types
             const isCompatible =
               typeof adapterType === 'string' &&
               COMPATIBLE_ADAPTER_TYPES.includes(adapterType)
-
-            console.log(
-              `Track ${track.name || track.trackId} adapter compatible:`,
-              isCompatible,
-              'Type:',
-              adapterType,
-              'Compatible types:',
-              COMPATIBLE_ADAPTER_TYPES,
-            )
 
             return isCompatible
           } catch (error) {
@@ -401,8 +468,16 @@ const stateModel = types
         },
       )
 
-      console.log('Filtered tracks:', filteredTracks)
-      return filteredTracks
+      // Return tracks with resolved names for React rendering
+      return filteredTracks.map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (track: any) => ({
+          ...track,
+          name: track.getConf
+            ? track.getConf('name')
+            : readConfObject(track, 'name') || track.trackId,
+        }),
+      )
     },
 
     // Get selected assembly object
@@ -417,18 +492,17 @@ const stateModel = types
           return undefined
         }
 
-        // Check both configuration and session assemblies
-        const allAssemblies = [
-          ...(session.assemblies || []),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...((session as any).sessionAssemblies || []),
-        ]
+        // Use only officially supported session assemblies
+        const allAssemblies = session.assemblies || []
 
         return allAssemblies.find(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (assembly: any) =>
-            assembly.name === self.selectedAssemblyId ||
-            assembly.configuration?.name === self.selectedAssemblyId,
+          (assembly: any) => {
+            const assemblyName = assembly.getConf
+              ? assembly.getConf('name')
+              : assembly.name
+            return assemblyName === self.selectedAssemblyId
+          },
         )
       } catch (error) {
         console.error('Error getting selected assembly:', error)
@@ -444,28 +518,70 @@ const stateModel = types
 
       try {
         const session = getSession(self)
-        return session?.tracks?.find(
+        const foundTrack = session?.tracks?.find(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (track: any) => track.trackId === self.selectedTrackId,
         )
+
+        // Resolve the name property of the selected track
+        if (foundTrack) {
+          return {
+            ...foundTrack,
+            name: readConfObject(foundTrack, 'name') || foundTrack.trackId,
+          }
+        }
+        return undefined
       } catch (error) {
         console.error('Error getting selected track:', error)
         return undefined
       }
     },
 
+    // Enhanced features getter that returns search results when available
+    get features() {
+      try {
+        const session = getSession(self)
+        if (!session || !self.selectedAssemblyId || !self.selectedTrackId) {
+          return []
+        }
+
+        // Return search results if we have them, otherwise empty array
+        // The UI component will trigger searches via the searchFeatures action
+        return self.searchResults || []
+      } catch (error) {
+        console.error('Error accessing features:', error)
+        return []
+      }
+    },
+
+    // Search state getters
+    get hasSearchTerm() {
+      return !!(self.searchTerm && self.searchTerm.trim() !== '')
+    },
+
+    get hasSearchResults() {
+      return !!(self.searchResults && self.searchResults.length > 0)
+    },
+
+    get canSearch() {
+      return !!(
+        self.selectedAssemblyId &&
+        self.selectedTrackId &&
+        !self.isSearching
+      )
+    },
+
     // Computed properties for easy access
     get hasContent() {
       return !!(
-        (self.featureDescriptions && self.featureDescriptions.trim() !== '') ??
-        (self.featureMarkdownUrls && self.featureMarkdownUrls.trim() !== '')
+        self.featureMarkdownUrls && self.featureMarkdownUrls.trim() !== ''
       )
     },
 
     get displayTitle() {
       return self.selectedFeatureId
         ? `${self.displayName} for ${String(self.selectedFeatureId)}`
-        : self.displayName || 'Flexible Textual Descriptions'
+        : self.displayName || 'Flexible Text Descriptions'
     },
 
     // Selection state helpers for UI
@@ -482,6 +598,4 @@ const stateModel = types
     },
   }))
 
-export type FlexibleTextualDescriptionsViewModel = Instance<typeof stateModel>
 export default stateModel
-export { FeatureType }

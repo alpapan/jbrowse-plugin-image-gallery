@@ -112,7 +112,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       return new ViewType({
         name: 'FlexibleTextualDescriptionsView',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        stateModel: flexibleTextualDescriptionsViewStateModel as any,
+        stateModel: flexibleTextualDescriptionsViewStateModel,
         ReactComponent: FlexibleTextualDescriptionsViewReactComponent,
       })
     })
@@ -122,7 +122,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       return new ViewType({
         name: 'FlexibleImageGalleryView',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        stateModel: flexibleImageGalleryViewStateModel as any,
+        stateModel: flexibleImageGalleryViewStateModel,
         ReactComponent: FlexibleImageGalleryViewReactComponent,
       })
     })
