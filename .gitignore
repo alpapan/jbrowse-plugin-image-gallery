@@ -125,6 +125,6 @@ cypress/screenshots
 
 # Ignore code editor
 .vscode
-jbrowse_image.code-workspace
+*workspace
 test.gff3
 .kilo*
