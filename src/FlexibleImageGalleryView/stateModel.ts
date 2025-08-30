@@ -4,7 +4,7 @@ import { getSession } from '@jbrowse/core/util'
 import { readConfObject } from '@jbrowse/core/configuration'
 import { MenuItem } from '@jbrowse/core/ui'
 
-// compatible adapter types for track filtering
+// Define compatible adapter types
 const COMPATIBLE_ADAPTER_TYPES = [
   'Gff3Adapter',
   'Gff3TabixAdapter',
@@ -43,12 +43,6 @@ export enum FeatureType {
   CONTIG = 'contig',
   GAP = 'gap',
   UNKNOWN = 'unknown',
-}
-
-// Helper function to check if adapter type is compatible
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function isCompatibleAdapter(adapterType: string): boolean {
-  return COMPATIBLE_ADAPTER_TYPES.includes(adapterType)
 }
 
 // Helper function to extract friendly assembly name in "Species (code)" format
@@ -178,9 +172,9 @@ const stateModel: any = types
     },
 
     // Perform text search using JBrowse2's text search system
-    searchFeatures(searchTerm: string) {
+    searchFeatures() {
       if (
-        !searchTerm.trim() ||
+        !self.searchTerm?.trim() ||
         !self.selectedAssemblyId ||
         !self.selectedTrackId
       ) {
@@ -216,11 +210,11 @@ const stateModel: any = types
         // This would be replaced with actual text search adapter calls
         const mockResults = [
           {
-            id: `search_${searchTerm}_1`,
-            name: `Feature matching "${searchTerm}"`,
+            id: `search_${self.searchTerm}_1`,
+            name: `Feature matching "${self.searchTerm}"`,
             type: 'gene',
             location: 'chr1:1000-2000',
-            description: `Mock feature for search term: ${searchTerm}`,
+            description: `Mock feature for search term: ${self.searchTerm}`,
             images: '',
             image_captions: '',
             image_group: '',
@@ -430,6 +424,7 @@ const stateModel: any = types
             // Use proper JBrowse API - the track itself is a configuration object
             let trackAssemblyId: string | undefined
             let adapterType: string | undefined
+            let hasTextSearch = false
 
             // Method 1: Use readConfObject directly on track (proper JBrowse API)
             try {
@@ -441,32 +436,58 @@ const stateModel: any = types
               adapterType = adapter
                 ? readConfObject(adapter, 'type')
                 : undefined
+
+              // Check for text search configuration
+              const textSearchConfig = readConfObject(track, 'textSearching')
+              hasTextSearch = Boolean(textSearchConfig?.textSearchAdapter)
+
               console.log('Method 1 - readConfObject on track (JBrowse API):', {
                 assemblyNames,
                 trackAssemblyId,
                 adapter,
                 adapterType,
+                textSearchConfig,
+                hasTextSearch,
               })
             } catch (e) {
-              console.log('Method 1 failed:', (e as Error).message)
-            }
-
-            // Method 2: Alternative getConf method if track has it
-            if (!trackAssemblyId && typeof track.getConf === 'function') {
+              console.log('Method 1 failed, trying fallback methods:', e)
+              // Fallback methods if needed
               try {
-                const assemblyNames = track.getConf('assemblyNames')
+                const assemblyNames = readConfObject(
+                  track.configuration,
+                  'assemblyNames',
+                )
                 trackAssemblyId = Array.isArray(assemblyNames)
                   ? assemblyNames[0]
                   : assemblyNames
-                const adapterConfig = track.getConf('adapter')
-                adapterType = adapterConfig ? adapterConfig.type : undefined
-                console.log('Method 2 - getConf (JBrowse API):', {
-                  assemblyNames,
-                  trackAssemblyId,
-                  adapterType,
-                })
-              } catch (e) {
-                console.log('Method 2 failed:', (e as Error).message)
+                const adapterConfig = readConfObject(
+                  track.configuration,
+                  'adapter',
+                )
+                adapterType = adapterConfig
+                  ? readConfObject(adapterConfig, 'type')
+                  : undefined
+
+                // Check for text search configuration
+                const textSearchConfig = readConfObject(
+                  track.configuration,
+                  'textSearching',
+                )
+                hasTextSearch = Boolean(textSearchConfig?.textSearchAdapter)
+
+                console.log(
+                  'Method 2 - readConfObject on track.configuration:',
+                  {
+                    assemblyNames,
+                    trackAssemblyId,
+                    adapterConfig,
+                    adapterType,
+                    textSearchConfig,
+                    hasTextSearch,
+                  },
+                )
+              } catch (e2) {
+                console.log('Method 2 failed as well:', e2)
               }
             }
 
@@ -474,6 +495,7 @@ const stateModel: any = types
               trackName: track.name,
               trackAssemblyId,
               adapterType,
+              hasTextSearch,
               selectedAssemblyId: self.selectedAssemblyId,
             })
 
@@ -502,7 +524,10 @@ const stateModel: any = types
               COMPATIBLE_ADAPTER_TYPES,
             )
 
-            return isCompatible
+            console.log('Track has text search:', hasTextSearch)
+
+            // Only show tracks that have both compatible adapter AND text search configured
+            return isCompatible && hasTextSearch
           } catch (error) {
             console.error('Error checking track configuration:', error)
             return false

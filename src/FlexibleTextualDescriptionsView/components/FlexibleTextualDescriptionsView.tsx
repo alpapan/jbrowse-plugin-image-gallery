@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   Typography,
   Paper,
@@ -9,12 +9,23 @@ import {
   Box,
   CircularProgress,
   Alert,
+  TextField,
+  Autocomplete,
 } from '@mui/material'
 import { TextualDescriptionsViewF } from '../../TextualDescriptionsView/components/Explainers'
 import { getAssemblyDisplayName } from '../stateModel'
 import { observer } from 'mobx-react'
-import { readConfObject } from '@jbrowse/core/configuration'
-import { getSession } from '@jbrowse/core/util'
+
+interface FeatureOption {
+  id: string
+  name: string
+  type: string
+  location?: string
+  description?: string
+  markdown_urls?: string
+  descriptions?: string
+  content_types?: string
+}
 
 interface FlexibleTextualDescriptionsViewProps {
   model: {
@@ -53,14 +64,14 @@ interface FlexibleTextualDescriptionsViewProps {
     canSelectTrack: boolean
     canSelectFeature: boolean
     isReady: boolean
-    features: {
-      id: string
-      name: string
-      type: string
-      markdown_urls?: string
-      descriptions?: string
-      content_types?: string
-    }[]
+    // Text search related properties
+    searchTerm?: string
+    searchResults: FeatureOption[]
+    isSearching: boolean
+    hasSearchTerm: boolean
+    hasSearchResults: boolean
+    canSearch: boolean
+    features: FeatureOption[]
     setSelectedAssembly: (assemblyId: string | undefined) => void
     setSelectedTrack: (trackId: string | undefined) => void
     setSelectedFeature: (
@@ -72,12 +83,47 @@ interface FlexibleTextualDescriptionsViewProps {
     ) => void
     clearSelections: () => void
     setLoadingFeatures: (loading: boolean) => void
+    // Text search related methods
+    setSearchTerm: (term: string) => void
+    searchFeatures: () => void
+    clearSearch: () => void
   }
 }
 
 const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescriptionsViewProps> =
   observer(({ model }) => {
     const [error, setError] = useState<string | null>(null)
+    const [searchInputValue, setSearchInputValue] = useState('')
+    const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+    // Handle search input changes with debouncing
+    const handleSearchInputChange = (value: string) => {
+      setSearchInputValue(value)
+
+      // Clear existing timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+
+      // Set new timeout
+      debounceTimeoutRef.current = setTimeout(() => {
+        model.setSearchTerm(value)
+        if (value.trim()) {
+          model.searchFeatures()
+        } else {
+          model.clearSearch()
+        }
+      }, 300)
+    }
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current)
+        }
+      }
+    }, [])
 
     // Use features from the model instead of loading them directly
     useEffect(() => {
@@ -100,23 +146,41 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
       }
     }, [model.features, model])
 
+    // Sync search input when model search term changes externally
+    useEffect(() => {
+      if (model.searchTerm !== searchInputValue) {
+        setSearchInputValue(model.searchTerm ?? '')
+      }
+    }, [model.searchTerm, searchInputValue])
+
     const handleAssemblyChange = (assemblyId: string) => {
       model.setSelectedAssembly(assemblyId ?? undefined)
     }
 
     const handleTrackChange = (trackId: string) => {
       model.setSelectedTrack(trackId ?? undefined)
+      // Clear search when track changes
+      setSearchInputValue('')
+      model.clearSearch()
     }
 
-    const handleFeatureChange = (featureId: string) => {
-      const selectedFeature = model.features.find(f => f.id === featureId)
-      if (selectedFeature) {
+    const handleFeatureSelect = (
+      feature: {
+        id: string
+        name: string
+        type: string
+        markdown_urls?: string
+        descriptions?: string
+        content_types?: string
+      } | null,
+    ) => {
+      if (feature) {
         model.setSelectedFeature(
-          selectedFeature.id,
-          selectedFeature.type === 'gene' ? 'GENE' : 'NON_GENE',
-          selectedFeature.markdown_urls,
-          selectedFeature.descriptions,
-          selectedFeature.content_types,
+          feature.id,
+          feature.type === 'gene' ? 'GENE' : 'NON_GENE',
+          feature.markdown_urls,
+          feature.descriptions,
+          feature.content_types,
         )
       } else {
         model.setSelectedFeature(undefined)
@@ -125,6 +189,8 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
 
     const handleClearSelections = () => {
       model.clearSelections()
+      setSearchInputValue('')
+      model.clearSearch()
       setError(null)
     }
 
@@ -208,33 +274,93 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
           )}
         </Box>
 
-        {/* Feature Selection */}
+        {/* Feature Search */}
         {model.selectedTrackId && (
           <Box sx={{ mb: 2 }}>
-            <FormControl fullWidth>
-              <InputLabel id="feature-select-label">Select Feature</InputLabel>
-              <Select
-                labelId="feature-select-label"
-                id="feature-select"
-                value={model.selectedFeatureId ?? ''}
-                label="Select Feature"
-                onChange={e => handleFeatureChange(e.target.value)}
-                disabled={model.isLoadingFeatures || !model.canSelectFeature}
+            <Autocomplete
+              key={`search-${model.selectedTrackId}`}
+              freeSolo
+              disableListWrap
+              inputValue={searchInputValue}
+              onInputChange={(_, value) => handleSearchInputChange(value || '')}
+              onChange={(_, value) => {
+                if (typeof value === 'object' && value !== null) {
+                  handleFeatureSelect(value)
+                } else {
+                  handleFeatureSelect(null)
+                }
+              }}
+              options={model.features || []}
+              getOptionLabel={option => {
+                if (typeof option === 'string') return option
+                return `${option.name ?? option.id} (${option.type})`
+              }}
+              loading={model.isSearching}
+              disabled={!model.canSearch}
+              renderInput={params => {
+                const { InputProps, ...restParams } = params
+                return (
+                  <TextField
+                    {...restParams}
+                    label="Search Features"
+                    placeholder="Type to search for features..."
+                    InputProps={{
+                      ...InputProps,
+                      endAdornment: (
+                        <>
+                          {model.isSearching && (
+                            <CircularProgress color="inherit" size={20} />
+                          )}
+                          {InputProps?.endAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )
+              }}
+              renderOption={(props, option) => (
+                <Box component="li" {...props}>
+                  <Box>
+                    <Typography variant="body2">
+                      <strong>{option.name ?? option.id}</strong>
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {option.type}
+                      {option.location && ` • ${option.location}`}
+                    </Typography>
+                    {option.description && (
+                      <Typography
+                        variant="caption"
+                        display="block"
+                        color="text.secondary"
+                      >
+                        {option.description.length > 100
+                          ? `${option.description.substring(0, 100)}...`
+                          : option.description}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              )}
+              noOptionsText={
+                !model.hasSearchTerm
+                  ? 'Start typing to search features...'
+                  : model.isSearching
+                    ? 'Searching...'
+                    : 'No features found'
+              }
+              ListboxProps={{
+                style: { maxHeight: '200px' },
+              }}
+            />
+            {!model.canSearch && model.selectedTrackId && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 1, display: 'block' }}
               >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
-                {model.features.map(feature => (
-                  <MenuItem key={feature.id} value={feature.id}>
-                    {feature.name ?? feature.id} ({feature.type})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            {model.isLoadingFeatures && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
-                <CircularProgress size={20} />
-              </Box>
+                Text search not available for this track
+              </Typography>
             )}
           </Box>
         )}
@@ -247,7 +373,9 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
         )}
 
         {/* Clear Button */}
-        {(model.selectedTrackId ?? model.selectedFeatureId) && (
+        {(model.selectedTrackId ??
+          model.selectedFeatureId ??
+          model.hasSearchTerm) && (
           <Box sx={{ mb: 2 }}>
             <Typography
               variant="body2"
@@ -322,14 +450,16 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
 
         {model.selectedTrackId &&
           !model.selectedFeatureId &&
-          !model.isLoadingFeatures && (
+          !model.hasSearchTerm &&
+          !model.isSearching && (
             <Box
               sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}
             >
               <Typography variant="body2" color="text.secondary">
-                Select a feature from the &ldquo;
-                {model.selectedTrack?.name ?? 'selected'}&rdquo; track to view
-                its textual descriptions.
+                Start typing in the search box above to find features from the
+                &ldquo;
+                {model.selectedTrack?.name ?? 'selected'}&rdquo; track and view
+                their textual descriptions.
               </Typography>
             </Box>
           )}
