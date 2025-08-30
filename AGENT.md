@@ -37,7 +37,7 @@ This document outlines the correct way to interact with the JBrowse 2 API, inten
 **Correct access pattern:**
 
 ```javascript
-import { getRoot } from '@jbrowse/core/util'
+import { getRoot } from 'mobx-state-tree'
 
 // From within any model in the tree
 const rootModel = getRoot(self)
@@ -58,7 +58,8 @@ The JBrowse 2 documentation notes that while they "generally prefer using the se
 
 
 ```javascript
-import { getSession, getRoot } from '@jbrowse/core/util'
+import { getSession } from '@jbrowse/core/util'
+import { getRoot } from 'mobx-state-tree'
 import { readConfObject } from '@jbrowse/core/configuration'
 
 function getTracksForAssembly(self: any) {
@@ -84,17 +85,15 @@ This is the correct way to access the `pluginManager` from within JBrowse 2 plug
 
 ### Assemblies
 
-1. **Get the `assemblyManager`:** `const assemblyManager = getSession(self).assemblyManager;`
-2. **List available assembly names:** `const assemblyNames = assemblyManager.assemblyNamesList;`
+1. **Get the `assemblyManager`:** `const assemblyManager = getSession(self).assemblyManager`
+2. **List available assembly names:** `const assemblyNames = assemblyManager.assemblyNamesList`
 3. **Get a specific assembly object:** `const assembly = await assemblyManager.waitForAssembly('assemblyName');` This ensures the assembly's regions and other data are loaded.
-4. **Get assembly regions:** `const regions = assembly.regions;`
+4. **Get assembly regions:** `const regions = assembly.regions`
 
 **PROVEN WORKING**: ✅ `getSession(self).assemblyManager.waitForAssembly(assemblyId)` works correctly for assembly access.  
 **PROVEN WORKING**: ✅ `assemblyManager.assemblyNamesList` for getting list of assembly names.
 
 ### Tracks
-
-**CORRECT JBrowse 2 API Pattern:**
 
 ```javascript
 import { getSession } from '@jbrowse/core/util'
@@ -136,8 +135,8 @@ The process involves getting the track's adapter and using it to fetch features.
     ```javascript     const adapterConfig = getConf(trackConf, 'adapter')     ```
 3. **Instantiate the Adapter:**  
     - You need the `pluginManager`
-    - Get the adapter class constructor: `const adapterTypeObj = pluginManager.getAdapterType(adapterConfig.type);`
-    - **PROVEN WORKING**: `await adapterTypeObj.getAdapterClass()` method returns a Promise that resolves to the constructor
+    - Get the adapter class constructor: `const adapterTypeObj = pluginManager.getAdapterType(adapterConfig.type);`.
+    - **PROVEN WORKING**: `await adapterTypeObj.getAdapterClass()` method returns a Promise that resolves to the constructor.
     - Create an instance: `const adapter = new AdapterClass(adapterConfig);`
 4. **Fetch Features:**  
     - `getFeatures` returns an RxJS `Observable`.
@@ -206,14 +205,14 @@ const MyCustomView = types
       })
       self.tracks.push(track)
     },
-    
+
     removeTrack(trackId: string) {
       const trackIndex = self.tracks.findIndex(track => track.id === trackId)
       if (trackIndex !== -1) {
         self.tracks.splice(trackIndex, 1)
       }
     },
-    
+
     setCustomProperty(value: string) {
       self.customProperty = value
     }
@@ -248,6 +247,7 @@ export default MyCustomViewComponent
 ```
 
 3. **Register the View in Your Plugin:** Add the view type to your plugin's install method.[^3]
+
 ```javascript
 import { ViewType } from '@jbrowse/core/pluggableElementTypes'
 
@@ -279,4 +279,3 @@ export default class MyPlugin extends Plugin {
 ```
 
 The view state model extends the `BaseViewModel` automatically, which provides core functionality like `id`, `displayName`, `minimized`, and actions like `setWidth` and `setMinimized`. Your custom view can then add additional properties and functionality specific to its purpose.[^2]
-
