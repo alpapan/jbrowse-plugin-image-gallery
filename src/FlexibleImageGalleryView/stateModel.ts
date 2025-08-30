@@ -1,8 +1,10 @@
 import { ElementId } from '@jbrowse/core/util/types/mst'
-import { types, Instance } from 'mobx-state-tree'
+import { types, Instance, getRoot } from 'mobx-state-tree'
 import { getSession } from '@jbrowse/core/util'
 import { readConfObject } from '@jbrowse/core/configuration'
 import { MenuItem } from '@jbrowse/core/ui'
+import { getConf } from '@jbrowse/core/configuration'
+import { toArray } from 'rxjs/operators'
 
 // Define compatible adapter types
 const COMPATIBLE_ADAPTER_TYPES = [
@@ -45,20 +47,34 @@ export enum FeatureType {
   UNKNOWN = 'unknown',
 }
 
+// Interface for search feature results
+export interface SearchFeature {
+  id: string
+  name: string
+  type: string
+  location: string
+  trackId: string
+  images: string
+  imageCaptions: string
+  imageGroup: string
+}
+
+// Define proper interfaces for JBrowse2 objects
+interface JBrowseTrack {
+  trackId: string
+  getConf?: (key: string) => unknown
+  [key: string]: unknown
+}
+
 // Helper function to extract friendly assembly name in "Species (code)" format
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getAssemblyDisplayName(assembly: any): string {
-  // Debug logging to understand the actual structure
-  console.log('Assembly object:', assembly)
-
   try {
     // Use the getConf method from Assembly API
     const displayName = assembly.getConf ? assembly.getConf('displayName') : ''
     const assemblyCode = assembly.getConf
       ? assembly.getConf('name')
       : assembly.name
-
-    // console.log('Display name:', displayName, 'Assembly code:', assemblyCode)
 
     // Check if displayName is actually different from name (meaning it's a friendly name)
     if (
@@ -108,6 +124,8 @@ const stateModel: any = types
     featureImages: types.maybe(types.string),
     featureLabels: types.maybe(types.string),
     featureTypes: types.maybe(types.string),
+    featureImageCaptions: types.maybe(types.string),
+    featureImageGroup: types.maybe(types.string),
     // Loading states for progressive UI
     isLoadingTracks: types.optional(types.boolean, false),
     isLoadingFeatures: types.optional(types.boolean, false),
@@ -165,105 +183,124 @@ const stateModel: any = types
       self.isSearching = searching
     },
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setSearchResults(results: any[]) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      self.searchResults = results as any
+    // Helper action to set feature data with fallback values
+    setFeatureDataFallback(featureId: string, featureType?: string) {
+      self.selectedFeatureId = featureId
+      self.selectedFeatureType = featureType ?? 'GENE'
+      self.featureImages = ''
+      self.featureImageCaptions = ''
+      self.featureImageGroup = ''
     },
 
-    // Perform text search using JBrowse2's text search system
-    searchFeatures() {
-      if (
-        !self.searchTerm?.trim() ||
-        !self.selectedAssemblyId ||
-        !self.selectedTrackId
-      ) {
-        self.searchResults.replace([])
-        return
+    // Helper action to set feature data synchronously (for async operations)
+    setFeatureData(
+      featureId: string,
+      featureType: string,
+      images: string,
+      imageCaptions: string,
+      imageGroup: string,
+    ) {
+      self.selectedFeatureId = featureId
+      self.selectedFeatureType = featureType
+      self.featureImages = images
+      self.featureImageCaptions = imageCaptions
+      self.featureImageGroup = imageGroup
+    },
+
+    // Set search results and clear loading state
+    setSearchResultsAndState(results: SearchFeature[]): void {
+      self.searchResults.replace(results)
+      self.isSearching = false
+    },
+
+    // Clear search results and loading state
+    clearSearchResultsAndState(): void {
+      self.searchResults.clear()
+      self.isSearching = false
+    },
+
+    async searchFeatures(): Promise<SearchFeature[]> {
+      if (!self.searchTerm.trim() || !self.selectedTrackId) {
+        this.clearSearchResultsAndState()
+        return []
       }
 
       try {
-        self.isSearching = true
         const session = getSession(self)
+        const { jbrowse } = session
 
-        // Check if track has text search configured using proper JBrowse2 API
-        const selectedTrack = session?.tracks?.find(
+        // Use correct JBrowse 2 API - readConfObject for reactive track access
+        const trackConfs = readConfObject(jbrowse.configuration, 'tracks') ?? []
+        const selectedTrack = trackConfs.find(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (track: any) => track.trackId === self.selectedTrackId,
+          (tc: any) => readConfObject(tc, 'trackId') === self.selectedTrackId,
         )
 
         if (!selectedTrack) {
-          console.warn('Selected track not found')
-          self.searchResults.replace([])
-          return
+          this.clearSearchResultsAndState()
+          return []
         }
 
-        // Check if track has text search configured
-        const textSearchConfig = readConfObject(selectedTrack, 'textSearching')
-        if (!textSearchConfig?.textSearchAdapter) {
-          console.warn('Track has no text search adapter configured')
-          self.searchResults.replace([])
-          return
-        }
+        // Get assembly name for search scope
+        const assemblyNames = readConfObject(selectedTrack, 'assemblyNames')
+        const assemblyName = Array.isArray(assemblyNames)
+          ? assemblyNames[0]
+          : assemblyNames
 
-        // For now, create mock search results to test the UI integration
-        // This would be replaced with actual text search adapter calls
-        const mockResults = [
+        // Use text search system - the CORRECT JBrowse 2 API per AGENT.md
+        const results = await session.textSearchManager?.search(
           {
-            id: `search_${self.searchTerm}_1`,
-            name: `Feature matching "${self.searchTerm}"`,
-            type: 'gene',
-            location: 'chr1:1000-2000',
-            description: `Mock feature for search term: ${self.searchTerm}`,
-            images: '',
-            image_captions: '',
-            image_group: '',
-            image_tag: '',
+            queryString: self.searchTerm,
           },
-        ]
+          {
+            assemblyName,
+            includeAggregateIndexes: false,
+          },
+          results => results,
+        )
 
-        // Filter and format results for UI display
-        const formattedResults = mockResults
-          .map(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (result: any) => {
-              try {
-                return {
-                  id: result.featureId || result.id || result.name,
-                  name: result.name || result.featureId || result.id,
-                  type: result.type || 'unknown',
-                  location: result.location
-                    ? `${result.location.refName}:${result.location.start}-${result.location.end}`
-                    : result.location || '',
-                  description: result.description || '',
-                  // Image-specific attributes
-                  images: result.attributes?.images || result.images || '',
-                  image_captions:
-                    result.attributes?.image_captions ||
-                    result.image_captions ||
-                    '',
-                  image_group:
-                    result.attributes?.image_group || result.image_group || '',
-                  image_tag:
-                    result.attributes?.image_tag || result.image_tag || '',
-                  // Store original result for reference
-                  originalResult: result,
-                }
-              } catch (error) {
-                console.error('Error formatting search result:', error)
-                return null
-              }
-            },
-          )
-          .filter(result => result !== null)
+        if (!results || results.length === 0) {
+          this.clearSearchResultsAndState()
+          return []
+        }
 
-        // Set results using MST array replace method
-        self.searchResults.replace(formattedResults)
+        // Transform search results - limit to 5 and create unique React keys
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const featuresWithData: SearchFeature[] = results
+          .slice(0, 5) // Limit to 5 results
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((result: any) => {
+            const locString =
+              result.locString ??
+              `${result.refName}:${result.start}-${result.end}`
+            const featureName =
+              result.label ??
+              result.name ??
+              result.displayString ??
+              'Unnamed Feature'
+
+            // Create unique ID using name + location to avoid React key conflicts
+            const uniqueId = `${featureName}@${locString}`
+
+            return {
+              id: uniqueId, // Unique ID for React keys
+              name: String(featureName), // Display name
+              type: 'gene',
+              location: locString,
+              trackId: self.selectedTrackId ?? 'unknown',
+              // No image data during search - keep it lightweight
+              images: '',
+              imageCaptions: '',
+              imageGroup: '',
+            }
+          })
+
+        this.setSearchResultsAndState(featuresWithData)
+        return featuresWithData
       } catch (error) {
-        console.error('Error performing text search:', error)
-        self.searchResults.replace([])
-      } finally {
-        self.isSearching = false
+        console.error('Search error:', error)
+        this.clearSearchResultsAndState()
+        return []
       }
     },
 
@@ -276,6 +313,8 @@ const stateModel: any = types
 
     // Set selected assembly (clears dependent selections)
     setSelectedAssembly(assemblyId: string | undefined) {
+      console.log('🔍 DEBUG: setSelectedAssembly called with:', assemblyId)
+
       self.selectedAssemblyId = assemblyId
       // Clear dependent selections when assembly changes
       if (self.selectedTrackId) {
@@ -285,39 +324,297 @@ const stateModel: any = types
         self.selectedFeatureId = undefined
         this.clearFeatureContent()
       }
-      // Clear search when assembly changes
-      this.clearSearch()
+
+      // Get session using JB2 best practices
+      const session = getSession(self)
+      console.log(
+        '🔍 DEBUG: Session has assemblyManager:',
+        !!session?.assemblyManager,
+      )
+      console.log('🔍 DEBUG: Session has assemblies:', !!session?.assemblies)
+
+      // Debug available assembly methods per AGENT.md
+      if (session?.assemblyManager) {
+        console.log(
+          '🔍 DEBUG: AssemblyManager methods:',
+          Object.getOwnPropertyNames(session.assemblyManager),
+        )
+      }
+
+      // Find selected assembly using JB2 API
+      const selectedAssembly = session?.assemblies?.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (assembly: any) => {
+          const name = assembly.getConf
+            ? assembly.getConf('name')
+            : assembly.name
+          return name === assemblyId
+        },
+      )
+
+      if (selectedAssembly) {
+        console.log(
+          '🔍 DEBUG: Selected assembly methods:',
+          Object.getOwnPropertyNames(selectedAssembly),
+        )
+      }
     },
 
     // Set selected track (clears dependent selections)
-    setSelectedTrack(trackId: string | undefined) {
+    async setSelectedTrack(trackId: string | undefined) {
+      console.log('🔍 DEBUG: setSelectedTrack called with:', trackId)
+
+      // Store the new track ID
       self.selectedTrackId = trackId
-      // Clear feature selection when track changes
+
+      // Clear dependent selections when track changes
       if (self.selectedFeatureId) {
         self.selectedFeatureId = undefined
         this.clearFeatureContent()
       }
-      // Clear search when track changes
-      this.clearSearch()
+
+      // Debug track access following JB2 API
+      if (trackId) {
+        const session = getSession(self)
+        const { jbrowse } = session
+
+        // Use correct JBrowse 2 API - readConfObject for reactive track access
+        const trackConfs = readConfObject(jbrowse.configuration, 'tracks') ?? []
+        const foundTrack = trackConfs.find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (tc: any) => readConfObject(tc, 'trackId') === trackId,
+        )
+
+        if (foundTrack) {
+          console.log(
+            '🔍 DEBUG: Selected track methods:',
+            Object.getOwnPropertyNames(foundTrack),
+          )
+          console.log('🔍 DEBUG: Track properties:', {
+            hasConfiguration: !!foundTrack.configuration,
+            trackId: readConfObject(foundTrack, 'trackId'),
+          })
+
+          // Debug adapter access per AGENT.md
+          try {
+            const adapterConfig = readConfObject(foundTrack, 'adapter')
+            const adapterType = adapterConfig
+              ? readConfObject(adapterConfig, 'type')
+              : undefined
+
+            console.log('🔍 DEBUG: Adapter config:', {
+              hasAdapter: !!adapterConfig,
+              adapterType,
+            })
+            console.log('🔍 DEBUG: Getting adapter type for:', adapterType)
+
+            try {
+              // Use correct JBrowse 2 API - access via session's root reference
+              const session = getSession(self)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const pluginManager = (session as any).root.pluginManager
+              console.log(
+                '🔍 DEBUG: PluginManager via session.root:',
+                !!pluginManager,
+              )
+
+              if (!pluginManager) {
+                console.log('🔍 DEBUG: No pluginManager found!')
+                return
+              }
+
+              console.log('🔍 DEBUG: Calling getAdapterType...')
+              const adapterTypeObj = pluginManager.getAdapterType(adapterType)
+              console.log('🔍 DEBUG: Adapter type object:', !!adapterTypeObj)
+              console.log(
+                '🔍 DEBUG: Adapter type object methods:',
+                adapterTypeObj
+                  ? Object.getOwnPropertyNames(adapterTypeObj)
+                  : 'none',
+              )
+
+              if (adapterTypeObj?.getAdapterClass) {
+                console.log('🔍 DEBUG: getAdapterClass method found')
+                console.log('🔍 DEBUG: Calling getAdapterClass() (async)...')
+                const AdapterClass = await adapterTypeObj.getAdapterClass()
+                console.log(
+                  '🔍 DEBUG: AdapterClass from getAdapterClass():',
+                  !!AdapterClass,
+                )
+                console.log('🔍 DEBUG: AdapterClass type:', typeof AdapterClass)
+                console.log(
+                  '🔍 DEBUG: AdapterClass toString:',
+                  AdapterClass?.toString(),
+                )
+                console.log(
+                  '🔍 DEBUG: AdapterClass prototype:',
+                  !!AdapterClass?.prototype,
+                )
+                console.log(
+                  '🔍 DEBUG: AdapterClass constructor:',
+                  AdapterClass?.constructor,
+                )
+                console.log(
+                  '🔍 DEBUG: AdapterClass properties:',
+                  Object.getOwnPropertyNames(AdapterClass),
+                )
+
+                if (AdapterClass) {
+                  console.log(
+                    '🔍 DEBUG: Attempting to create adapter instance...',
+                  )
+                  try {
+                    const adapterInstance = new AdapterClass(adapterConfig)
+                    console.log('🔍 DEBUG: Adapter created:', !!adapterInstance)
+                    console.log(
+                      '🔍 DEBUG: Adapter methods:',
+                      Object.getOwnPropertyNames(adapterInstance),
+                    )
+
+                    // Test region for feature fetching (chr1:1-50000)
+                    const testRegion = {
+                      refName: 'chr1',
+                      start: 1,
+                      end: 50000,
+                      assemblyName: self.selectedAssemblyId,
+                    }
+                    console.log('🔍 DEBUG: Test region:', testRegion)
+
+                    if (adapterInstance.getFeatures) {
+                      console.log('🔍 DEBUG: Calling getFeatures...')
+                      const featuresObservable =
+                        adapterInstance.getFeatures(testRegion)
+                      console.log(
+                        '🔍 DEBUG: Features observable:',
+                        !!featuresObservable,
+                      )
+
+                      // Convert observable to array using imported toArray
+                      console.log(
+                        '🔍 DEBUG: Converting features observable to array...',
+                      )
+
+                      const features = await featuresObservable
+                        .pipe(toArray())
+                        .toPromise()
+                      console.log(
+                        '🔍 DEBUG: Features array length:',
+                        features?.length || 0,
+                      )
+
+                      if (features && features.length > 0) {
+                        console.log('🔍 DEBUG: First feature:', features[0])
+                        console.log(
+                          '🔍 DEBUG: First feature methods:',
+                          Object.getOwnPropertyNames(features[0]),
+                        )
+                        console.log(
+                          '🔍 DEBUG: First feature ID (get method):',
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                          features[0].get
+                            ? features[0].get('ID')
+                            : 'no get method',
+                        )
+                        console.log(
+                          '🔍 DEBUG: First feature id() method:',
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                          features[0].id ? features[0].id() : 'no id method',
+                        )
+
+                        // Extract unique IDs from all features
+                        const featureIds = features
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          .map((feature: any) => feature.get('ID'))
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          .filter((id: any) => id)
+                        const uniqueIds = [...new Set(featureIds as string[])]
+                        console.log(
+                          '🔍 DEBUG: Unique feature IDs found:',
+                          uniqueIds.length,
+                        )
+                        console.log(
+                          '🔍 DEBUG: Sample unique IDs:',
+                          uniqueIds.slice(0, 5),
+                        )
+                      }
+                    } else {
+                      console.log(
+                        '🔍 DEBUG: Adapter missing getFeatures method',
+                      )
+                    }
+                  } catch (error) {
+                    console.log(
+                      '🔍 DEBUG: Error creating adapter instance:',
+                      error,
+                    )
+                  }
+                } else {
+                  console.log(
+                    '🔍 DEBUG: getAdapterClass() returned null/undefined',
+                  )
+                }
+              } else {
+                console.log(
+                  '🔍 DEBUG: getAdapterClass method not found in adapter type object',
+                )
+              }
+            } catch (error) {
+              console.log('🔍 DEBUG: Error during adapter operations:', error)
+            }
+          } catch (error) {
+            console.log('🔍 DEBUG: Error getting adapter config:', error)
+          }
+        }
+      }
     },
 
-    // Set selected feature and update content
+    // SYNCHRONOUS feature selection - no RPC calls per AGENT.md
     setSelectedFeature(
       featureId: string | undefined,
-      featureType?: FeatureType,
+      featureType?: string,
       images?: string,
-      labels?: string,
-      types?: string,
+      imageCaptions?: string,
+      imageGroup?: string,
     ) {
-      self.selectedFeatureId = featureId
-      if (featureType) {
-        self.selectedFeatureType = featureType.toString()
+      if (!featureId) {
+        this.clearFeatureContent()
+        return
       }
 
-      if (featureId && images) {
-        this.updateFeatureContent(images, labels, types)
+      // If called with explicit image data, use it directly
+      if (images && imageCaptions !== undefined && imageGroup !== undefined) {
+        this.setFeatureData(
+          featureId,
+          featureType ?? 'GENE',
+          images,
+          imageCaptions,
+          imageGroup,
+        )
+        return
+      }
+
+      // Find the feature in search results
+      const foundFeature = self.searchResults.find(
+        result => result.id === featureId,
+      )
+      if (foundFeature) {
+        // Extract feature name from unique ID (format: "name@location")
+        const featureName = foundFeature.name
+
+        console.log('🔍 DEBUG: Found feature:', foundFeature)
+        console.log('🔍 DEBUG: Feature name from ID:', featureName)
+
+        // Set selection synchronously - no async RPC calls
+        this.setFeatureData(
+          String(featureName), // Use feature name as ID
+          featureType ?? 'GENE',
+          '', // No image data initially - will be populated if available
+          '',
+          '',
+        )
       } else {
-        this.clearFeatureContent()
+        // Fallback
+        this.setFeatureDataFallback(featureId, featureType)
       }
     },
 
@@ -390,163 +687,71 @@ const stateModel: any = types
 
     // Get available tracks from session (filtered by assembly and compatibility)
     get availableTracks() {
-      console.log(
-        'availableTracks called with selectedAssemblyId:',
-        self.selectedAssemblyId,
-      )
-
-      // Must have assembly selected first
-      if (!self.selectedAssemblyId) {
-        console.log('No assembly selected, returning empty tracks array')
-        return []
-      }
-
       const session = getSession(self)
-      console.log('Session object:', session)
-      console.log('Session tracks:', session?.tracks)
+      const { jbrowse } = session
 
-      if (!session?.tracks) {
-        console.log('No session tracks found')
+      if (!self.selectedAssemblyId) {
         return []
       }
 
-      // Filter tracks by assembly and compatible adapters
-      const filteredTracks = session.tracks.filter(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (track: any) => {
-          console.log('Checking track:', track)
-          console.log(
-            'Track properties:',
-            track ? Object.keys(track as Record<string, unknown>) : 'no track',
-          )
-
-          try {
-            // Use proper JBrowse API - the track itself is a configuration object
-            let trackAssemblyId: string | undefined
-            let adapterType: string | undefined
-            let hasTextSearch = false
-
-            // Method 1: Use readConfObject directly on track (proper JBrowse API)
-            try {
-              const assemblyNames = readConfObject(track, 'assemblyNames')
-              trackAssemblyId = Array.isArray(assemblyNames)
-                ? assemblyNames[0]
-                : assemblyNames
-              const adapter = readConfObject(track, 'adapter')
-              adapterType = adapter
-                ? readConfObject(adapter, 'type')
-                : undefined
-
-              // Check for text search configuration
-              const textSearchConfig = readConfObject(track, 'textSearching')
-              hasTextSearch = Boolean(textSearchConfig?.textSearchAdapter)
-
-              console.log('Method 1 - readConfObject on track (JBrowse API):', {
-                assemblyNames,
-                trackAssemblyId,
-                adapter,
-                adapterType,
-                textSearchConfig,
-                hasTextSearch,
-              })
-            } catch (e) {
-              console.log('Method 1 failed, trying fallback methods:', e)
-              // Fallback methods if needed
-              try {
-                const assemblyNames = readConfObject(
-                  track.configuration,
-                  'assemblyNames',
-                )
-                trackAssemblyId = Array.isArray(assemblyNames)
-                  ? assemblyNames[0]
-                  : assemblyNames
-                const adapterConfig = readConfObject(
-                  track.configuration,
-                  'adapter',
-                )
-                adapterType = adapterConfig
-                  ? readConfObject(adapterConfig, 'type')
-                  : undefined
-
-                // Check for text search configuration
-                const textSearchConfig = readConfObject(
-                  track.configuration,
-                  'textSearching',
-                )
-                hasTextSearch = Boolean(textSearchConfig?.textSearchAdapter)
-
-                console.log(
-                  'Method 2 - readConfObject on track.configuration:',
-                  {
-                    assemblyNames,
-                    trackAssemblyId,
-                    adapterConfig,
-                    adapterType,
-                    textSearchConfig,
-                    hasTextSearch,
-                  },
-                )
-              } catch (e2) {
-                console.log('Method 2 failed as well:', e2)
-              }
-            }
-
-            console.log('Final track info:', {
-              trackName: track.name,
-              trackAssemblyId,
-              adapterType,
-              hasTextSearch,
-              selectedAssemblyId: self.selectedAssemblyId,
-            })
-
-            // Check if track belongs to selected assembly
-            if (
-              !trackAssemblyId ||
-              trackAssemblyId !== self.selectedAssemblyId
-            ) {
-              console.log(
-                `Track assembly mismatch or missing: ${trackAssemblyId} !== ${self.selectedAssemblyId}`,
-              )
-              return false
-            }
-
-            // Check if adapter type is compatible
-            const isCompatible =
-              typeof adapterType === 'string' &&
-              COMPATIBLE_ADAPTER_TYPES.includes(adapterType)
-
-            console.log(
-              'Track adapter compatible:',
-              isCompatible,
-              'Type:',
-              adapterType,
-              'Compatible types:',
-              COMPATIBLE_ADAPTER_TYPES,
-            )
-
-            console.log('Track has text search:', hasTextSearch)
-
-            // Only show tracks that have both compatible adapter AND text search configured
-            return isCompatible && hasTextSearch
-          } catch (error) {
-            console.error('Error checking track configuration:', error)
-            return false
-          }
-        },
+      console.log(
+        '🔍 DEBUG: Session tracks available: true count:',
+        this.availableTrackCount,
       )
 
-      console.log('Filtered tracks:', filteredTracks)
+      // Use correct JBrowse 2 API - readConfObject for reactive track access
+      const trackConfs = readConfObject(jbrowse.configuration, 'tracks') ?? []
 
-      // Return tracks with resolved names for React rendering
-      return filteredTracks.map(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (track: any) => ({
-          ...track,
-          name: track.getConf
-            ? track.getConf('name')
-            : readConfObject(track, 'name') || track.trackId,
-        }),
-      )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const compatibleTracks = trackConfs.filter((trackConf: any) => {
+        const trackId = readConfObject(trackConf, 'trackId')
+        console.log('🔍 DEBUG: Checking track:', trackId)
+
+        // Get track assembly names using readConfObject
+        const trackAssemblyNames =
+          readConfObject(trackConf, 'assemblyNames') ?? []
+        const assemblyMatches = trackAssemblyNames.includes(
+          self.selectedAssemblyId,
+        )
+
+        // Get adapter config using readConfObject
+        const adapterConfig = readConfObject(trackConf, 'adapter')
+        const adapterType = adapterConfig
+          ? readConfObject(adapterConfig, 'type')
+          : undefined
+        const hasIndex = adapterConfig
+          ? !!readConfObject(adapterConfig, 'index')
+          : false
+
+        console.log('🔍 DEBUG: Track info:', {
+          trackId,
+          trackAssemblyId: trackAssemblyNames[0] || 'none',
+          selectedAssemblyId: self.selectedAssemblyId,
+          adapterType,
+          hasIndex,
+        })
+
+        const isCompatible = adapterType === 'Gff3TabixAdapter'
+
+        console.log('🔍 DEBUG: Track filter results:', {
+          assemblyMatches,
+          isCompatible,
+          hasIndex,
+          willInclude: assemblyMatches && isCompatible && hasIndex,
+        })
+
+        return assemblyMatches && isCompatible && hasIndex
+      })
+
+      console.log('🔍 DEBUG: Filtered tracks count:', compatibleTracks.length)
+      return compatibleTracks
+    },
+
+    get availableTrackCount() {
+      const session = getSession(self)
+      const { jbrowse } = session
+      const trackConfs = readConfObject(jbrowse.configuration, 'tracks') ?? []
+      return trackConfs.length
     },
 
     // Get selected assembly object
@@ -582,28 +787,33 @@ const stateModel: any = types
     // Get selected track object
     get selectedTrack() {
       if (!self.selectedTrackId) {
-        return undefined
-      }
+        try {
+          // Use correct JBrowse 2 API - readConfObject for reactive track access
+          const session = getSession(self)
+          const { jbrowse } = session
+          const trackConfs =
+            readConfObject(jbrowse.configuration, 'tracks') ?? []
+          const foundTrack = trackConfs.find(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (tc: any) => readConfObject(tc, 'trackId') === self.selectedTrackId,
+          )
 
-      try {
-        const session = getSession(self)
-        const foundTrack = session?.tracks?.find(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (track: any) => track.trackId === self.selectedTrackId,
-        )
-
-        // Resolve the name property of the selected track
-        if (foundTrack) {
-          return {
-            ...foundTrack,
-            name: readConfObject(foundTrack, 'name') || foundTrack.trackId,
+          // Resolve the name property of the selected track
+          if (foundTrack) {
+            return {
+              ...foundTrack,
+              name: readConfObject(foundTrack, 'name') || foundTrack.trackId,
+            }
           }
+          return undefined
+        } catch (error) {
+          console.error('Error getting selected track:', error)
+          return undefined
         }
-        return undefined
-      } catch (error) {
-        console.error('Error getting selected track:', error)
-        return undefined
       }
+
+      // TODO: Add real flow here
+      return undefined
     },
 
     // Enhanced features getter that returns search results when available

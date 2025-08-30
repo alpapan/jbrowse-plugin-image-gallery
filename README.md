@@ -16,6 +16,8 @@ If you're testing with the jbrowse plugin suite, this would be the right url to 
 `yarn start` for jbrowse-web, `npm run start` and `npm run browser` for this plugin:
 `http://localhost:3000/?config=http%3A%2F%2Flocalhost%3A9000%2Fjbrowse_config.json`
 
+Please make sure you run `jbrowse text-index --perTrack --force` in the .jbrowse directory after you launch your dev environment.
+
 ## Installation
 
 ### Method 1: Add Plugin via JBrowse plugin store (not yet)

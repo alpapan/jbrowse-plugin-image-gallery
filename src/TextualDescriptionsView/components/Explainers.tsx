@@ -382,7 +382,9 @@ const NewickTreeRenderer: React.FC<{ data: string }> = ({ data }) => {
       } catch (err) {
         console.error('Newick rendering error:', err)
         setError(
-          `Failed to render tree: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to render tree: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
         )
         setLoading(false)
       }

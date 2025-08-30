@@ -588,8 +588,8 @@ const ImageGalleryView = observer(function ImageGalleryView({
             {model.minimized
               ? model.displayTitle
               : hasSelectedFeature
-                ? `No images available for ${model.selectedFeatureId}`
-                : 'No feature with images selected'}
+              ? `No images available for ${model.selectedFeatureId}`
+              : 'No feature with images selected'}
           </Typography>
           <IconButton
             size="small"

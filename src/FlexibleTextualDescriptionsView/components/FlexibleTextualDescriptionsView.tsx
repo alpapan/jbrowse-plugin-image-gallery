@@ -130,7 +130,7 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
       // Simply use the features from the model - no direct data loading here
       if (model.selectedTrackId && model.selectedTrack) {
         // The model will handle loading features through proper JBrowse2 patterns
-        console.log('Track selected, model will handle feature loading')
+        //console.log('Track selected, model will handle feature loading')
       }
     }, [model, model.selectedTrackId, model.selectedTrack])
 
@@ -346,8 +346,8 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
                 !model.hasSearchTerm
                   ? 'Start typing to search features...'
                   : model.isSearching
-                    ? 'Searching...'
-                    : 'No features found'
+                  ? 'Searching...'
+                  : 'No features found'
               }
               ListboxProps={{
                 style: { maxHeight: '200px' },

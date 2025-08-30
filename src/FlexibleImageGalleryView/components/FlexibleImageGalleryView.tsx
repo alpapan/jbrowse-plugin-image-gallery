@@ -10,11 +10,14 @@ import {
   CircularProgress,
   Alert,
   TextField,
-  Autocomplete,
+  // Autocomplete,
 } from '@mui/material'
 import { observer } from 'mobx-react'
 import ImageGalleryView from '../../ImageGalleryView/components/ImageGalleryView'
 import { getAssemblyDisplayName } from '../stateModel'
+
+// Constants
+const SEARCH_DEBOUNCE_MS = 300
 
 interface FeatureOption {
   id: string
@@ -95,26 +98,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
     const [error, setError] = useState<string | null>(null)
     const [searchInputValue, setSearchInputValue] = useState('')
     const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-    // Handle search input changes with debouncing
-    const handleSearchInputChange = (value: string) => {
-      setSearchInputValue(value)
-
-      // Clear existing timeout
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current)
-      }
-
-      // Set new timeout
-      debounceTimeoutRef.current = setTimeout(() => {
-        model.setSearchTerm(value)
-        if (value.trim()) {
-          model.searchFeatures()
-        } else {
-          model.clearSearch()
-        }
-      }, 300)
-    }
+    const isUpdatingSearchRef = useRef(false)
 
     // Cleanup timeout on unmount
     useEffect(() => {
@@ -125,16 +109,26 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
       }
     }, [])
 
-    // Use features from the model instead of loading them directly
+    // Debounced search effect
     useEffect(() => {
-      // Simply use the features from the model - no direct data loading here
-      if (model.selectedTrackId && model.selectedTrack) {
-        // The model will handle loading features through proper JBrowse2 patterns
-        console.log('Track selected, model will handle feature loading')
+      if (!searchInputValue?.trim()) {
+        return
       }
-    }, [model, model.selectedTrackId, model.selectedTrack])
 
-    // Clear feature selection when features change
+      const timeoutId = setTimeout(() => {
+        if (isUpdatingSearchRef.current) {
+          return // Skip if we're updating from model changes
+        }
+
+        //console.log('🔍 Debounced search executing with:', searchInputValue)
+        model.setSearchTerm(searchInputValue)
+        // Search is automatically triggered by the model when searchTerm changes
+      }, SEARCH_DEBOUNCE_MS)
+
+      return () => clearTimeout(timeoutId)
+    }, [searchInputValue, model])
+
+    // Clear selected feature if it no longer exists in features list
     useEffect(() => {
       if (model.selectedFeatureId && model.features.length > 0) {
         const selectedFeatureExists = model.features.some(
@@ -148,10 +142,15 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
 
     // Sync search input when model search term changes externally
     useEffect(() => {
-      if (model.searchTerm !== searchInputValue) {
+      // Only sync if we're not the ones updating the search term
+      if (
+        !isUpdatingSearchRef.current &&
+        model.searchTerm !== searchInputValue
+      ) {
         setSearchInputValue(model.searchTerm ?? '')
       }
-    }, [model.searchTerm, searchInputValue])
+      isUpdatingSearchRef.current = false
+    }, [model.searchTerm])
 
     const handleAssemblyChange = (assemblyId: string) => {
       model.setSelectedAssembly(assemblyId ?? undefined)
@@ -277,90 +276,66 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
         {/* Feature Search */}
         {model.selectedTrackId && (
           <Box sx={{ mb: 2 }}>
-            <Autocomplete
-              key={`search-${model.selectedTrackId}`}
-              freeSolo
-              disableListWrap
-              inputValue={searchInputValue}
-              onInputChange={(_, value) => handleSearchInputChange(value || '')}
-              onChange={(_, value) => {
-                if (typeof value === 'object' && value !== null) {
-                  handleFeatureSelect(value)
-                } else {
-                  handleFeatureSelect(null)
+            <TextField
+              fullWidth
+              label="Search Features"
+              placeholder="Type to search for features (min 3 chars)..."
+              value={searchInputValue}
+              onChange={e => {
+                const newValue = e.target.value
+                //console.log('DEBUG: onChange fired with:', newValue)
+                setSearchInputValue(newValue)
+
+                // Handle debounced search separately
+                if (debounceTimeoutRef.current) {
+                  clearTimeout(debounceTimeoutRef.current)
                 }
+                debounceTimeoutRef.current = setTimeout(() => {
+                  isUpdatingSearchRef.current = true
+                  model.setSearchTerm(newValue)
+                  if (newValue.trim().length >= 3) {
+                    model.searchFeatures()
+                  } else {
+                    model.clearSearch()
+                  }
+                }, 300)
               }}
-              options={model.features || []}
-              getOptionLabel={option => {
-                if (typeof option === 'string') return option
-                return `${option.name ?? option.id} (${option.type})`
-              }}
-              loading={model.isSearching}
-              disabled={!model.canSearch}
-              renderInput={params => {
-                const { InputProps, ...restParams } = params
-                return (
-                  <TextField
-                    {...restParams}
-                    label="Search Features"
-                    placeholder="Type to search for features..."
-                    InputProps={{
-                      ...InputProps,
-                      endAdornment: (
-                        <>
-                          {model.isSearching && (
-                            <CircularProgress color="inherit" size={20} />
-                          )}
-                          {InputProps?.endAdornment}
-                        </>
-                      ),
-                    }}
-                  />
-                )
-              }}
-              renderOption={(props, option) => (
-                <Box component="li" {...props}>
-                  <Box>
-                    <Typography variant="body2">
-                      <strong>{option.name ?? option.id}</strong>
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {option.type}
-                      {option.location && ` • ${option.location}`}
-                    </Typography>
-                    {option.description && (
-                      <Typography
-                        variant="caption"
-                        display="block"
-                        color="text.secondary"
-                      >
-                        {option.description.length > 100
-                          ? `${option.description.substring(0, 100)}...`
-                          : option.description}
-                      </Typography>
+              onFocus={() => {}}
+              onBlur={() => {}}
+              onKeyDown={() => {}} // Remove unused parameter from onKeyDown
+              InputProps={{
+                endAdornment: (
+                  <>
+                    {model.isSearching && (
+                      <CircularProgress color="inherit" size={20} />
                     )}
-                  </Box>
-                </Box>
-              )}
-              noOptionsText={
-                !model.hasSearchTerm
-                  ? 'Start typing to search features...'
-                  : model.isSearching
-                    ? 'Searching...'
-                    : 'No features found'
-              }
-              ListboxProps={{
-                style: { maxHeight: '200px' },
+                  </>
+                ),
               }}
             />
-            {!model.canSearch && model.selectedTrackId && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: 1, display: 'block' }}
-              >
-                Text search not available for this track
-              </Typography>
+            {/* Show search results in a simple list for now */}
+            {model.features.length > 0 && (
+              <Box sx={{ mt: 1, maxHeight: 200, overflow: 'auto' }}>
+                {model.features.map(feature => (
+                  <Box
+                    key={feature.id}
+                    sx={{
+                      p: 1,
+                      cursor: 'pointer',
+                      '&:hover': { backgroundColor: 'action.hover' },
+                    }}
+                    onClick={() => handleFeatureSelect(feature)}
+                  >
+                    <Typography variant="body2">
+                      <strong>{feature.name ?? feature.id}</strong>
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {feature.type}
+                      {feature.location && ` • ${feature.location}`}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
             )}
           </Box>
         )}
