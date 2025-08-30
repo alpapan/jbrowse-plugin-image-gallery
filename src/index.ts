@@ -5,13 +5,13 @@ import { AbstractSessionModel, isAbstractMenuManager } from '@jbrowse/core/util'
 import { autorun } from 'mobx'
 import { version } from '../package.json'
 import {
-  ReactComponent as ImageGalleryViewReactComponent,
-  stateModel as imageGalleryViewStateModel,
-} from './ImageGalleryView'
+  ReactComponent as SelectImageGalleryViewReactComponent,
+  stateModel as selectImageGalleryViewStateModel,
+} from './SelectImageGalleryView'
 import {
-  ReactComponent as TextualDescriptionsViewReactComponent,
-  stateModel as textualDescriptionsViewStateModel,
-} from './TextualDescriptionsView'
+  ReactComponent as SelectTextualDescriptionsViewReactComponent,
+  stateModel as selectTextualDescriptionsViewStateModel,
+} from './SelectTextualDescriptionsView'
 import {
   ReactComponent as FlexibleTextualDescriptionsViewReactComponent,
   stateModel as flexibleTextualDescriptionsViewStateModel,
@@ -46,8 +46,8 @@ interface JBrowseFeature {
   children?: () => JBrowseFeature[]
 }
 
-// Interface for ImageGalleryView with its specific methods
-interface ImageGalleryView extends Record<string, unknown> {
+// Interface for SelectImageGalleryView with its specific methods
+interface SelectImageGalleryView extends Record<string, unknown> {
   id: string
   type: string
   updateFeature?: (
@@ -61,8 +61,8 @@ interface ImageGalleryView extends Record<string, unknown> {
   clearFeature?: () => void
 }
 
-// Interface for TextualDescriptionsView with its specific methods
-interface TextualDescriptionsView extends Record<string, unknown> {
+// Interface for SelectTextualDescriptionsView with its specific methods
+interface SelectTextualDescriptionsView extends Record<string, unknown> {
   id: string
   type: string
   updateFeature?: (
@@ -87,23 +87,23 @@ export default class RichAnnotationsPlugin extends Plugin {
   private lastSelectedFeatureId: string | undefined = undefined
 
   install(pluginManager: PluginManager) {
-    // Register ImageGalleryView
+    // Register SelectImageGalleryView
     pluginManager.addViewType(() => {
       return new ViewType({
-        name: 'ImageGalleryView',
+        name: 'SelectImageGalleryView',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        stateModel: imageGalleryViewStateModel as any,
-        ReactComponent: ImageGalleryViewReactComponent,
+        stateModel: selectImageGalleryViewStateModel as any,
+        ReactComponent: SelectImageGalleryViewReactComponent,
       })
     })
 
-    // Register TextualDescriptionsView
+    // Register SelectTextualDescriptionsView
     pluginManager.addViewType(() => {
       return new ViewType({
-        name: 'TextualDescriptionsView',
+        name: 'SelectTextualDescriptionsView',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        stateModel: textualDescriptionsViewStateModel as any,
-        ReactComponent: TextualDescriptionsViewReactComponent,
+        stateModel: selectTextualDescriptionsViewStateModel as any,
+        ReactComponent: SelectTextualDescriptionsViewReactComponent,
       })
     })
 
@@ -122,7 +122,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       return new ViewType({
         name: 'FlexibleImageGalleryView',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        stateModel: flexibleImageGalleryViewStateModel,
+        stateModel: flexibleImageGalleryViewStateModel as any,
         ReactComponent: FlexibleImageGalleryViewReactComponent,
       })
     })
@@ -131,21 +131,21 @@ export default class RichAnnotationsPlugin extends Plugin {
   configure(pluginManager: PluginManager) {
     if (isAbstractMenuManager(pluginManager.rootModel)) {
       pluginManager.rootModel.appendToMenu('Add', {
-        label: 'Image Gallery View',
+        label: 'Select Image Gallery View',
         onClick: (session: AbstractSessionModel) => {
-          session.addView('ImageGalleryView', {
+          session.addView('SelectImageGalleryView', {
             id: 'imageGalleryView',
-            displayName: 'Image Gallery',
+            displayName: 'Select Image Gallery',
           })
         },
       })
 
       pluginManager.rootModel.appendToMenu('Add', {
-        label: 'Textual Descriptions View',
+        label: 'Select Textual Descriptions View',
         onClick: (session: AbstractSessionModel) => {
-          session.addView('TextualDescriptionsView', {
+          session.addView('SelectTextualDescriptionsView', {
             id: 'textualDescriptionsView',
-            displayName: 'Textual Descriptions',
+            displayName: 'Select Textual Descriptions',
           })
         },
       })
@@ -221,7 +221,7 @@ export default class RichAnnotationsPlugin extends Plugin {
             selectedFeature &&
             featureSummary.id
           ) {
-            this.manageImageGalleryView(session, featureSummary)
+            this.manageSelectImageGalleryView(session, featureSummary)
           } else if (
             featureSummary &&
             typeof featureSummary === 'object' &&
@@ -229,10 +229,13 @@ export default class RichAnnotationsPlugin extends Plugin {
             featureSummary.id
           ) {
             // Feature selected but no images - update view to show selected feature without images
-            this.manageImageGalleryViewWithoutImages(session, featureSummary)
+            this.manageSelectImageGalleryViewWithoutImages(
+              session,
+              featureSummary,
+            )
           } else {
             // Clear view for all other cases: no selection, invalid data, etc.
-            this.clearImageGalleryView(session)
+            this.clearSelectImageGalleryView(session)
           }
 
           // Handle TextualDescriptionsView view for features with textual content
@@ -242,10 +245,10 @@ export default class RichAnnotationsPlugin extends Plugin {
             selectedFeature &&
             featureSummary.id
           ) {
-            this.manageTextualDescriptionsView(session, featureSummary)
+            this.manageSelectTextualDescriptionsView(session, featureSummary)
           } else {
             // Clear view for all other cases: no selection, invalid data, etc.
-            this.clearTextualDescriptionsView(session)
+            this.clearSelectTextualDescriptionsView(session)
           }
         } catch (e) {
           console.error(
@@ -262,8 +265,8 @@ export default class RichAnnotationsPlugin extends Plugin {
     }
   }
 
-  // Method to manage ImageGalleryView
-  private manageImageGalleryView(
+  // Method to manage SelectImageGalleryView
+  private manageSelectImageGalleryView(
     session: AbstractSessionModel,
     featureSummary: FeatureSummary,
   ) {
@@ -282,17 +285,18 @@ export default class RichAnnotationsPlugin extends Plugin {
         return
       }
 
-      // Check if ImageGalleryView already exists - do NOT create new ones automatically
-      const imageGalleryView = session?.views
+      // Check if SelectImageGalleryView already exists - do NOT create new ones automatically
+      const selectImageGalleryView = session?.views
         ? (session.views.find(
-            view => view.type === 'ImageGalleryView' && view.id === viewId,
-          ) as unknown as ImageGalleryView)
+            view =>
+              view.type === 'SelectImageGalleryView' && view.id === viewId,
+          ) as unknown as SelectImageGalleryView)
         : null
 
       // Only update existing views, don't create new ones
       // Views should only be created when user explicitly adds them via menu
       if (
-        imageGalleryView?.updateFeature &&
+        selectImageGalleryView?.updateFeature &&
         featureSummary.id &&
         featureSummary.images
       ) {
@@ -309,7 +313,7 @@ export default class RichAnnotationsPlugin extends Plugin {
 
         // Validate that we still have the same feature (prevent race conditions)
         if (this.lastSelectedFeatureId === featureSummary.id) {
-          imageGalleryView.updateFeature(
+          selectImageGalleryView.updateFeature(
             featureSummary.id,
             featureSummary.type === 'gene'
               ? FeatureType.GENE
@@ -322,7 +326,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       }
     } catch (e) {
       console.error(
-        'RichAnnotationsPlugin: Error managing ImageGalleryView for feature',
+        'RichAnnotationsPlugin: Error managing SelectImageGalleryView for feature',
         featureSummary.id,
         ':',
         e,
@@ -330,25 +334,29 @@ export default class RichAnnotationsPlugin extends Plugin {
     }
   }
 
-  // Method to manage ImageGalleryView for features without images
-  private manageImageGalleryViewWithoutImages(
+  // Method to manage SelectImageGalleryView for features without images
+  private manageSelectImageGalleryViewWithoutImages(
     session: AbstractSessionModel,
     featureSummary: FeatureSummary,
   ) {
     try {
       const viewId = 'imageGalleryView'
 
-      // Check if ImageGalleryView already exists - do NOT create new ones automatically
-      const imageGalleryView = session?.views
+      // Check if SelectImageGalleryView already exists - do NOT create new ones automatically
+      const selectImageGalleryView = session?.views
         ? (session.views.find(
-            view => view.type === 'ImageGalleryView' && view.id === viewId,
-          ) as unknown as ImageGalleryView)
+            view =>
+              view.type === 'SelectImageGalleryView' && view.id === viewId,
+          ) as unknown as SelectImageGalleryView)
         : null
 
       // Only update existing views, don't create new ones for features without images
       // Views should only be created when user explicitly adds them via menu
-      if (imageGalleryView?.updateFeatureWithoutImages && featureSummary.id) {
-        imageGalleryView.updateFeatureWithoutImages(
+      if (
+        selectImageGalleryView?.updateFeatureWithoutImages &&
+        featureSummary.id
+      ) {
+        selectImageGalleryView.updateFeatureWithoutImages(
           featureSummary.id,
           featureSummary.type === 'gene'
             ? FeatureType.GENE
@@ -357,7 +365,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       }
     } catch (e) {
       console.error(
-        'RichAnnotationsPlugin: Error managing ImageGalleryView for feature without images',
+        'RichAnnotationsPlugin: Error managing SelectImageGalleryView for feature without images',
         featureSummary.id,
         ':',
         e,
@@ -365,8 +373,8 @@ export default class RichAnnotationsPlugin extends Plugin {
     }
   }
 
-  // Method to manage TextualDescriptionsView
-  private manageTextualDescriptionsView(
+  // Method to manage SelectTextualDescriptionsView
+  private manageSelectTextualDescriptionsView(
     session: AbstractSessionModel,
     featureSummary: FeatureSummary,
   ) {
@@ -379,17 +387,18 @@ export default class RichAnnotationsPlugin extends Plugin {
         return
       }
 
-      // Check if TextualDescriptionsView already exists - do NOT create new ones automatically
-      const textualDescriptionsView = session?.views
+      // Check if SelectTextualDescriptionsView already exists - do NOT create new ones automatically
+      const selectTextualDescriptionsView = session?.views
         ? (session.views.find(
             view =>
-              view.type === 'TextualDescriptionsView' && view.id === viewId,
-          ) as unknown as TextualDescriptionsView)
+              view.type === 'SelectTextualDescriptionsView' &&
+              view.id === viewId,
+          ) as unknown as SelectTextualDescriptionsView)
         : null
 
       // Only update existing views, don't create new ones
       // Views should only be created when user explicitly adds them via menu
-      if (textualDescriptionsView?.updateFeature) {
+      if (selectTextualDescriptionsView?.updateFeature) {
         // Convert arrays to comma-separated strings if needed
         const markdownUrlsString: string = Array.isArray(
           featureSummary.markdownUrls,
@@ -407,7 +416,7 @@ export default class RichAnnotationsPlugin extends Plugin {
           ? featureSummary.contentTypes.join(',')
           : String(featureSummary.contentTypes || '') // Default to empty string if undefined
 
-        textualDescriptionsView.updateFeature(
+        selectTextualDescriptionsView.updateFeature(
           featureSummary.id || 'unknown',
           featureSummary.type
             ? featureSummary.type === 'gene'
@@ -421,7 +430,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       }
     } catch (e) {
       console.error(
-        'RichAnnotationsPlugin: Error managing TextualDescriptionsView for feature',
+        'RichAnnotationsPlugin: Error managing SelectTextualDescriptionsView for feature',
         featureSummary.id,
         ':',
         e,
@@ -429,44 +438,45 @@ export default class RichAnnotationsPlugin extends Plugin {
     }
   }
 
-  // Method to clear ImageGalleryView
-  private clearImageGalleryView(session: AbstractSessionModel) {
+  // Method to clear SelectImageGalleryView
+  private clearSelectImageGalleryView(session: AbstractSessionModel) {
     try {
       const viewId = 'imageGalleryView'
       if (session?.views) {
-        const imageGalleryView = session.views.find(
-          view => view.type === 'ImageGalleryView' && view.id === viewId,
-        ) as unknown as ImageGalleryView
+        const selectImageGalleryView = session.views.find(
+          view => view.type === 'SelectImageGalleryView' && view.id === viewId,
+        ) as unknown as SelectImageGalleryView
         // Atomic clear: Only clear if view exists and has clearFeature method
-        if (imageGalleryView?.clearFeature) {
+        if (selectImageGalleryView?.clearFeature) {
           // Reset last selected feature to ensure clean state
           this.lastSelectedFeatureId = undefined
-          imageGalleryView.clearFeature()
+          selectImageGalleryView.clearFeature()
         }
       }
     } catch (e) {
       console.error(
-        'RichAnnotationsPlugin: Error clearing ImageGalleryView:',
+        'RichAnnotationsPlugin: Error clearing SelectImageGalleryView:',
         e,
       )
     }
   }
 
-  // Method to clear TextualDescriptionsView
-  private clearTextualDescriptionsView(session: AbstractSessionModel) {
+  // Method to clear SelectTextualDescriptionsView
+  private clearSelectTextualDescriptionsView(session: AbstractSessionModel) {
     try {
       const viewId = 'textualDescriptionsView'
       if (session?.views) {
-        const textualDescriptionsView = session.views.find(
-          view => view.type === 'TextualDescriptionsView' && view.id === viewId,
-        ) as unknown as TextualDescriptionsView
-        if (textualDescriptionsView?.clearFeature) {
-          textualDescriptionsView.clearFeature()
+        const selectTextualDescriptionsView = session.views.find(
+          view =>
+            view.type === 'SelectTextualDescriptionsView' && view.id === viewId,
+        ) as unknown as SelectTextualDescriptionsView
+        if (selectTextualDescriptionsView?.clearFeature) {
+          selectTextualDescriptionsView.clearFeature()
         }
       }
     } catch (e) {
       console.error(
-        'RichAnnotationsPlugin: Error clearing TextualDescriptionsView:',
+        'RichAnnotationsPlugin: Error clearing SelectTextualDescriptionsView:',
         e,
       )
     }

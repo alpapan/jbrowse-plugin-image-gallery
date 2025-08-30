@@ -549,7 +549,7 @@ const ImageGalleryContent = observer(function ImageGalleryContent({
   )
 })
 
-const ImageGalleryView = observer(function ImageGalleryView({
+const SelectImageGalleryView = observer(function SelectImageGalleryView({
   model,
 }: ImageGalleryViewProps) {
   const handleMinimizeToggle = () => {
@@ -667,4 +667,4 @@ const ImageGalleryView = observer(function ImageGalleryView({
   )
 })
 
-export default ImageGalleryView
+export default SelectImageGalleryView

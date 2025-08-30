@@ -1,20 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { observer } from 'mobx-react'
 import {
+  Button,
+  TextField,
+  Box,
   Typography,
+  CircularProgress,
+  Alert,
   Paper,
   Select,
   MenuItem,
   FormControl,
   InputLabel,
-  Box,
-  CircularProgress,
-  Alert,
-  TextField,
   Autocomplete,
 } from '@mui/material'
-import { TextualDescriptionsViewF } from '../../TextualDescriptionsView/components/Explainers'
+import SearchIcon from '@mui/icons-material/Search'
+import ClearIcon from '@mui/icons-material/Clear'
+import { SelectTextualDescriptionsViewF } from '../../SelectTextualDescriptionsView/components/Explainers'
 import { getAssemblyDisplayName } from '../stateModel'
-import { observer } from 'mobx-react'
 
 interface FeatureOption {
   id: string
@@ -94,36 +97,24 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
   observer(({ model }) => {
     const [error, setError] = useState<string | null>(null)
     const [searchInputValue, setSearchInputValue] = useState('')
-    const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-    // Handle search input changes with debouncing
-    const handleSearchInputChange = (value: string) => {
-      setSearchInputValue(value)
-
-      // Clear existing timeout
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current)
-      }
-
-      // Set new timeout
-      debounceTimeoutRef.current = setTimeout(() => {
+    const searchHandler = useCallback(
+      (value: string) => {
         model.setSearchTerm(value)
         if (value.trim()) {
           model.searchFeatures()
         } else {
           model.clearSearch()
         }
-      }, 300)
-    }
+      },
+      [model],
+    )
 
     // Cleanup timeout on unmount
     useEffect(() => {
       return () => {
-        if (debounceTimeoutRef.current) {
-          clearTimeout(debounceTimeoutRef.current)
-        }
+        model.clearSearch()
       }
-    }, [])
+    }, [model])
 
     // Use features from the model instead of loading them directly
     useEffect(() => {
@@ -282,7 +273,7 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
               freeSolo
               disableListWrap
               inputValue={searchInputValue}
-              onInputChange={(_, value) => handleSearchInputChange(value || '')}
+              onInputChange={(_, value) => searchHandler(value || '')}
               onChange={(_, value) => {
                 if (typeof value === 'object' && value !== null) {
                   handleFeatureSelect(value)
@@ -393,7 +384,7 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
           <Box sx={{ mt: 2 }}>
             {model.hasContent ? (
               // Use the existing Explainers component for content display
-              <TextualDescriptionsViewF
+              <SelectTextualDescriptionsViewF
                 model={{
                   hasContent: model.hasContent,
                   displayTitle: `Content for ${model.selectedFeatureId}`,

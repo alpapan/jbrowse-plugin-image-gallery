@@ -32,19 +32,9 @@ This document outlines the correct way to interact with the JBrowse 2 API, inten
 
 ## Correct Way to Access PluginManager
 
- The `pluginManager` is located on the root model, not the session model.
+The `pluginManager` is located on the root model, not the session model.
 
 **Correct access pattern:**
-
-```javascript
-import { getRoot } from 'mobx-state-tree'
-
-// From within any model in the tree
-const rootModel = getRoot(self)
-const pluginManager = rootModel.pluginManager
-```
-
-**Alternative pattern:**
 
 ```javascript
 import { getSession } from '@jbrowse/core/util'
@@ -69,7 +59,7 @@ function getTracksForAssembly(self: any) {
   
   const trackConfs = readConfObject(session.jbrowse.configuration, 'tracks') ?? []
   const trackConf = trackConfs.find(tc => readConfObject(tc, 'trackId') === trackId)
-  
+
   // Now use pluginManager to get adapter
   const adapterConfig = readConfObject(trackConf, 'adapter')
   const adapterTypeObj = pluginManager.getAdapterType(adapterConfig.type)
@@ -130,23 +120,53 @@ function getTracksForAssembly(self: any) {
 The process involves getting the track's adapter and using it to fetch features.
 
 1. **Get the session and track configuration:**
-    ```javascript     const session = getSession(self)     const trackConfs = getConf(session.jbrowse.configuration, 'tracks') ?? []     const trackConf = trackConfs.find(tc => getConf(tc, 'trackId') === trackId)     ```
+    ```javascript     const session = getSession(self)     const trackConfs = getConf(session.jbrowse.configuration, 'tracks') ?? []     const trackConf = trackConfs.find(tc => getConf(tc, 'trackId') === trackId)     ```
 2. **Get the adapter configuration from the track configuration:**
-    ```javascript     const adapterConfig = getConf(trackConf, 'adapter')     ```
-3. **Instantiate the Adapter:**  
-    - You need the `pluginManager`
-    - Get the adapter class constructor: `const adapterTypeObj = pluginManager.getAdapterType(adapterConfig.type);`.
-    - **PROVEN WORKING**: `await adapterTypeObj.getAdapterClass()` method returns a Promise that resolves to the constructor.
-    - Create an instance: `const adapter = new AdapterClass(adapterConfig);`
-4. **Fetch Features:**  
-    - `getFeatures` returns an RxJS `Observable`.
-    ```javascript
-    import { toArray } from 'rxjs/operators';
+    ```javascript     const adapterConfig = getConf(trackConf, 'adapter')     ```
+3. **Instantiate the Adapter:**  
+    - You need the `pluginManager`
+    - Get the adapter class constructor: `const adapterTypeObj = pluginManager.getAdapterType(adapterConfig.type);`.
+    - **PROVEN WORKING**: `await adapterTypeObj.getAdapterClass()` method returns a Promise that resolves to the constructor.
+    - Create an instance: `const adapter = new AdapterClass(adapterConfig);`
+4. **Fetch Features:**  
+    - `getFeatures` returns an RxJS `Observable`.
+    ```javascript
+    import { toArray } from 'rxjs/operators';
 
 const region = { refName: 'chr1', start: 0, end: 50000, assemblyName: 'hg19' };
-    const featuresObservable = adapter.getFeatures(region);
-    const features = await featuresObservable.pipe(toArray()).toPromise();
-    ```
+    const featuresObservable = adapter.getFeatures(region);
+    const features = await featuresObservable.pipe(toArray()).toPromise();
+    ```
+
+**ALTERNATIVE - PROVEN WORKING RPC PATTERN:**
+For getting features using JBrowse's RPC system (recommended approach):
+
+```javascript
+// Get adapter config from track config using readConfObject
+const adapter = readConfObject(trackConf, 'adapter')
+
+// Use session's RPC manager to get features
+const rpcManager = session.rpcManager
+const sessionId = session.id
+
+const featureResults = await rpcManager.call(
+  sessionId,
+  'CoreGetFeatures',
+  {
+    sessionId,
+    regions: [queryRegion],
+    adapterConfig: adapter,
+  },
+)
+
+// The RPC result IS the features array directly
+const features = Array.isArray(featureResults) ? featureResults : []
+```
+
+**PROVEN WORKING**: ✅ `rpcManager.call(sessionId, 'CoreGetFeatures', {...})` with sessionId as first parameter  
+**PROVEN WORKING**: ✅ Using `readConfObject(trackConf, 'adapter')` for adapterConfig  
+**PROVEN WORKING**: ✅ `regions: [queryRegion]` (array format) and `adapterConfig: adapter`
+
 
 #### Fetching Unique Identifiers from a GFF Track
 
@@ -154,8 +174,8 @@ For a GFF track (using `Gff3TabixAdapter`), the features are standard `SimpleFea
 
 1. Follow the steps above to get an array of features.
 2. Iterate through the features and get their IDs. The primary ID is often in the 'ID' attribute.
-    ```javascript     const featureIds = features.map(feature => feature.get('ID'));     const uniqueIds = [...new Set(featureIds)];     ```
-    You can also use `feature.id()` for a unique internal ID for the feature object.
+   ```javascript     const featureIds = features.map(feature => feature.get('ID'));     const uniqueIds = [...new Set(featureIds)]; ```
+   You can also use `feature.id()` for a unique internal ID for the feature object.
 
 ## Important Best Practices
 
@@ -193,7 +213,7 @@ const MyCustomView = types
     // Add computed properties here
     get trackCount() {
       return self.tracks.length
-    }
+    },
   }))
   .actions(self => ({
     // Add actions to modify state
@@ -201,7 +221,7 @@ const MyCustomView = types
       const trackType = pluginManager.getTrackType(trackConfig.type)
       const track = trackType.stateModel.create({
         ...trackConfig,
-        id: `${self.id}_track_${self.tracks.length}`
+        id: `${self.id}_track_${self.tracks.length}`,
       })
       self.tracks.push(track)
     },
@@ -215,7 +235,7 @@ const MyCustomView = types
 
     setCustomProperty(value: string) {
       self.customProperty = value
-    }
+    },
   }))
 ```
 
@@ -227,6 +247,7 @@ import { getSession } from '@jbrowse/core/util'
 
 const MyCustomViewComponent = observer(({ model }: { model: any }) => {
   const session = getSession(model)
+  
   
   return (
     <div style={{ width: '100%', height: '100%' }}>
@@ -252,8 +273,7 @@ export default MyCustomViewComponent
 import { ViewType } from '@jbrowse/core/pluggableElementTypes'
 
 export default class MyPlugin extends Plugin {
-  name = 'MyPlugin'
-  
+  name = 'MyPlugin'  	
   install(pluginManager: PluginManager) {
     pluginManager.addViewType(() => {
       return new ViewType({

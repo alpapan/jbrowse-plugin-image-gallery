@@ -82,16 +82,6 @@ export function getAssemblyDisplayName(assembly: any): string {
     // Look for common assembly patterns and create friendly names
     const name = String(assemblyCode || assembly.name || '').toLowerCase()
 
-    if (name.includes('hg19') || name === 'grch37') {
-      return 'Homo sapiens (hg19)'
-    } else if (name.includes('hg38') || name === 'grch38') {
-      return 'Homo sapiens (hg38)'
-    } else if (name.includes('mm10')) {
-      return 'Mus musculus (mm10)'
-    } else if (name.includes('mm39')) {
-      return 'Mus musculus (mm39)'
-    }
-
     // For other assemblies, use the original name
     return String(assemblyCode || assembly.name || 'Unknown Assembly')
   } catch (error) {
@@ -869,7 +859,7 @@ const stateModel: any = types
                       }
                       const adapterAssemblyNames = typedAdapter.assemblyNames
                       return Array.isArray(adapterAssemblyNames)
-                        ? adapterAssemblyNames.includes(trackAssemblyId)
+                        ? adapterAssemblyNames.includes(trackAssemblyId!)
                         : adapterAssemblyNames === trackAssemblyId
                     },
                   )

@@ -13,7 +13,7 @@ import {
   // Autocomplete,
 } from '@mui/material'
 import { observer } from 'mobx-react'
-import ImageGalleryView from '../../ImageGalleryView/components/ImageGalleryView'
+import ImageGalleryView from '../../SelectImageGalleryView/components/ImageGalleryView'
 import { getAssemblyDisplayName } from '../stateModel'
 
 // Constants
@@ -87,9 +87,11 @@ interface FlexibleImageGalleryViewProps {
     clearSelections: () => void
     setLoadingFeatures: (loading: boolean) => void
     // Text search related methods
-    setSearchTerm: (term: string) => void
+    setSearchText: (term: string) => void
     searchFeatures: () => void
     clearSearch: () => void
+    // Feature selection with image data fetching
+    selectFeatureWithImageData: (featureId: string | undefined) => void
   }
 }
 
@@ -121,7 +123,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
         }
 
         //console.log('🔍 Debounced search executing with:', searchInputValue)
-        model.setSearchTerm(searchInputValue)
+        model.setSearchText(searchInputValue)
         // Search is automatically triggered by the model when searchTerm changes
       }, SEARCH_DEBOUNCE_MS)
 
@@ -174,13 +176,8 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
       } | null,
     ) => {
       if (feature) {
-        model.setSelectedFeature(
-          feature.id,
-          feature.type === 'gene' ? 'GENE' : 'NON_GENE',
-          feature.images,
-          feature.image_captions,
-          feature.image_group,
-        )
+        // Use the new action that fetches image data
+        model.selectFeatureWithImageData(feature.id)
       } else {
         model.setSelectedFeature(undefined)
       }
@@ -292,7 +289,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
                 }
                 debounceTimeoutRef.current = setTimeout(() => {
                   isUpdatingSearchRef.current = true
-                  model.setSearchTerm(newValue)
+                  model.setSearchText(newValue)
                   if (newValue.trim().length >= 3) {
                     model.searchFeatures()
                   } else {

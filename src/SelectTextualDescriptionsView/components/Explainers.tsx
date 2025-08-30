@@ -529,8 +529,8 @@ const MarkdownComponents = {
   ),
 }
 
-export const TextualDescriptionsViewF: React.FC<TextualDescriptionsViewProps> =
-  observer(({ model }) => {
+export const SelectTextualDescriptionsViewF: React.FC<TextualDescriptionsViewProps> =
+  observer(({ model }: TextualDescriptionsViewProps) => {
     const [content, setContent] = useState<string>('')
     const [loading, setLoading] = useState<boolean>(false)
 
@@ -654,4 +654,4 @@ export const TextualDescriptionsViewF: React.FC<TextualDescriptionsViewProps> =
     )
   })
 
-export default TextualDescriptionsViewF
+export default SelectTextualDescriptionsViewF

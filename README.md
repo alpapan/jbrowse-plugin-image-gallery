@@ -2,8 +2,8 @@
 
 A comprehensive JBrowse 2 plugin that provides two complementary views for displaying feature-associated content:
 
-- **ImageGalleryView**: Displays images within feature details with automatic loading and organization
-- **TextualDescriptionsView**: Renders markdown documents for genomic features with cytoscape diagram support
+- **SelectImageGalleryView**: Displays images within feature details with automatic loading and organization
+- **SelectTextualDescriptionsView**: Renders markdown documents for genomic features with cytoscape diagram support
 
 Both views appear automatically when selecting features with the appropriate data attributes.
 
@@ -13,7 +13,8 @@ Both views appear automatically when selecting features with the appropriate dat
 ## Testing
 
 If you're testing with the jbrowse plugin suite, this would be the right url to visit after you have
-`yarn start` for jbrowse-web, `npm run start` and `npm run browser` for this plugin:
+`yarn start` for jbrowse-web, `npm run start` and `npm run browser` for this plugin.
+
 `http://localhost:3000/?config=http%3A%2F%2Flocalhost%3A9000%2Fjbrowse_config.json`
 
 Please make sure you run `jbrowse text-index --perTrack --force` in the .jbrowse directory after you launch your dev environment.
@@ -29,6 +30,7 @@ Go to https://github.com/alpapan/jbrowse-plugin-image-gallery/releases
 download the jbrowse-plugin-image-gallery.umd.production.min.js
 
 Option 2:
+
 
 ```bash
 git clone https://github.com/alpapan/jbrowse-plugin-image-gallery.git
@@ -66,6 +68,7 @@ This plugin includes the following key dependencies for enhanced functionality:
 
 ## Example Configuration
 
+
 ```json
 {
   "plugins": [
@@ -98,7 +101,7 @@ This plugin includes the following key dependencies for enhanced functionality:
       "assemblyNames": ["hg38"],
       "adapter": {
         "type": "Gff3Adapter",
-        "gffLocation": { "uri": "genes_with_content.gff3" }
+        "gffLocation": { "uri": "genes_with_content.gff3" }        
       }
     }
   ]
@@ -107,7 +110,7 @@ This plugin includes the following key dependencies for enhanced functionality:
 
 ## Creating GFF Files
 
-### ImageGalleryView Attributes
+### SelectImageGalleryView Attributes
 
 #### Required Attributes
 - `image` or `images`: comma-separated list of image URLs (use one or the other)
@@ -116,7 +119,7 @@ This plugin includes the following key dependencies for enhanced functionality:
 - `image_group`: comma-separated labels for each image (used as container titles)
 - `image_tag`: comma-separated types for each image (displayed as chips below images)
 
-### TextualDescriptionsView Attributes
+### SelectTextualDescriptionsView Attributes
 
 #### Required Attributes
 - `markdown_urls` or `markdown_url`: comma-separated list of markdown document URLs
@@ -131,16 +134,16 @@ This plugin includes the following key dependencies for enhanced functionality:
 ##gff-version 3
 ##sequence-region chr1 1 248956422
 
-# Single image (ImageGalleryView)
+# Single image (SelectImageGalleryView)
 chr1	source	gene	1000	2000	.	+	.	ID=gene1;image=https://example.com/image.jpg
 
-# Multiple images with labels and types (ImageGalleryView)
+# Multiple images with labels and types (SelectImageGalleryView)
 chr1	source	gene	3000	4000	.	+	.	ID=gene2;image=https://example.com/img1.jpg,https://example.com/img2.png;image_group=Microscopy,Western;image_tag=experimental,analysis
 
-# Single markdown document (TextualDescriptionsView)
+# Single markdown document (SelectTextualDescriptionsView)
 chr1	source	gene	5000	6000	.	+	.	ID=gene3;markdown_urls=https://example.com/gene3_docs.md
 
-# Multiple markdown documents with descriptions (TextualDescriptionsView)
+# Multiple markdown documents with descriptions (SelectTextualDescriptionsView)
 chr1	source	gene	7000	8000	.	+	.	ID=gene4;markdown_urls=https://example.com/tutorial.md,https://example.com/analysis.md;descriptions=Tutorial Guide,Functional Analysis;content_type=tutorial,analysis
 
 # Combined: Both images and markdown for the same feature
@@ -155,12 +158,12 @@ chr1	source	gene	11000	12000	.	+	.	ID=gene6;images=https://example.com/legacy.jp
 
 ### Content Requirements
 
-#### Images (ImageGalleryView)
+#### Images (SelectImageGalleryView)
 - Supported formats: JPG, PNG, GIF, SVG, BMP, WEBP, TIFF, ICO
 - URLs must be accessible from the browser
 - CORS headers required for cross-domain images
 
-#### Markdown Documents (TextualDescriptionsView)
+#### Markdown Documents (SelectTextualDescriptionsView)
 - Standard markdown format with GitHub Flavored Markdown (GFM) extensions
 - URLs must be accessible from the browser
 - CORS headers required for cross-domain documents
@@ -173,9 +176,9 @@ Select any feature with image or markdown data. The appropriate views appear aut
 
 ### Manual Mode
 1. Right-click in view area
-2. Select "Add" → "Image Gallery View" or "Add" → "Textual Descriptions View"
+2. Select "Add" → "Select Image Gallery View" or "Add" → "Select Textual Descriptions View"
 
-## ImageGalleryView Features
+## SelectImageGalleryView Features
 
 - Automatic image display on feature selection
 - Lazy loading with intersection observer
@@ -184,7 +187,7 @@ Select any feature with image or markdown data. The appropriate views appear aut
 - Fallback placeholder for failed image loads
 - Click images to open in new tab
 
-## TextualDescriptionsView Features
+## SelectTextualDescriptionsView Features
 
 - **Markdown Rendering**: Full GitHub Flavored Markdown (GFM) support
 - **Syntax Highlighting**: Code blocks with language-specific highlighting
@@ -210,7 +213,7 @@ Select any feature with image or markdown data. The appropriate views appear aut
 
 ### Cytoscape Diagrams
 
-TextualDescriptionsView supports interactive cytoscape diagrams embedded in markdown using fenced code blocks:
+SelectTextualDescriptionsView supports interactive cytoscape diagrams embedded in markdown using fenced code blocks:
 
 
 ````markdown
@@ -226,15 +229,14 @@ TextualDescriptionsView supports interactive cytoscape diagrams embedded in mark
   "style": [
     {
       "selector": "node[label*='Gene']",
-      "style": { "background-color": "#e74c3c", "shape": "ellipse" }
+      "style": { "background-color": "#e74c3c", "shape": "ellipse" }	
     },
     {
-      "selector": "node[label*='Protein']", 
-      "style": { "background-color": "#2ecc71", "shape": "rectangle" }
-    }
-  ]
+      "selector": "node[label*='protein']", 
+      "style": { "background-color": "#2ecc71", "shape": "rectangle" }	
+    }	
+  ]	
 }
-```
 ````
 
 #### Cytoscape Diagram Format
@@ -260,59 +262,50 @@ This pathway shows the relationship between genes and their protein products:
 
 ```cytoscape
 {
+{
   "elements": [
     { "data": { "id": "brca1", "label": "BRCA1" } },
     { "data": { "id": "brca2", "label": "BRCA2" } },
     { "data": { "id": "p53", "label": "P53" } },
-    { "data": { "id": "dna_repair", "label": "DNA Repair Complex" } },
+    { "data": { "id": "dna_repair", "label": "DNA Repair Complex" } },  
     { "data": { "source": "brca1", "target": "dna_repair", "id": "edge1" } },
     { "data": { "source": "brca2", "target": "dna_repair", "id": "edge2" } },
     { "data": { "source": "p53", "target": "dna_repair", "id": "edge3" } }
   ],
   "style": [
     {
-      "selector": "node",
+      "selector": "node", 
       "style": {
-        "background-color": "#3498db",
-        "label": "data(label)",
-        "text-valign": "center",
-        "color": "#2c3e50",
-        "shape": "roundrectangle",
-        "width": "80px",
-        "height": "40px"
-      }
+        "background-color": "#3498db", 
+        "label": "data(label)", 
+        "text-valign": "center", 
+        "color": "#2c3e50", 
+        "shape": "roundrectangle", 
+        "width": "80px", 
+        "height": "40px" 
+      }	
     },
     {
-      "selector": "node[label='DNA Repair Complex']",
-      "style": {
-        "background-color": "#e74c3c",
-        "shape": "ellipse",
-        "width": "120px"
-      }
+      "selector": "node[label='DNA Repair Complex']", 
+      "style": { "background-color": "#e74c3c", "shape": "ellipse", "width": "120px" }	
     },
     {
-      "selector": "edge",
-      "style": {
-        "width": 3,
-        "line-color": "#7f8c8d",
-        "target-arrow-color": "#7f8c8d",
-        "target-arrow-shape": "triangle"
-      }
-    }
-  ]
+      "selector": "edge", 
+      "style": { "width": 3, "line-color": "#7f8c8d", "target-arrow-color": "#7f8c8d", "target-arrow-shape": "triangle" }	
+    }	
+  ]	
 }
 ```
 
 ### Phylogenetic Trees
 
-TextualDescriptionsView supports interactive phylogenetic tree visualization from Newick format embedded in markdown using fenced code blocks:
+SelectTextualDescriptionsView supports interactive phylogenetic tree visualization from Newick format embedded in markdown using fenced code blocks:
 
 
 ````markdown
 ```newick
 ((Human:0.1,Chimp:0.2):0.3,(Mouse:0.4,Rat:0.5):0.6); [DR1 Gene Evolution - Phylogenetic relationships across species]
 ```
-````
 
 #### Newick Format Specifications
 
@@ -325,7 +318,7 @@ TextualDescriptionsView supports interactive phylogenetic tree visualization fro
 
 **Examples of Valid Newick Formats**:
 ```
-Simple tree:           (A,B,C);
+Simple tree:           (A,B,C);\n
 With branch lengths:   (A:0.1,B:0.2,C:0.3);  
 Nested groups:         ((A:0.1,B:0.2):0.5,(C:0.3,D:0.4):0.6);
 With internal labels:  ((A,B)AB,(C,D)CD)Root;
@@ -344,13 +337,11 @@ You can add titles and descriptions using square bracket comments at the end of 
 ```newick
 ((Human:0.1,Chimp:0.2):0.3,(Mouse:0.4,Rat:0.5):0.6); [Mammalian Evolution]
 ```
-````
 
 ````markdown
 ```newick  
 (((A:0.1,B:0.2):0.3,C:0.4):0.5,D:0.6); [Gene Family Tree - Evolutionary relationships of orthologous genes]
 ```
-````
 
 #### Tree Visualization Features
 
@@ -386,6 +377,7 @@ This tree demonstrates:
 - **Rodent clade**: Mouse and rat clustering
 - **Branch lengths**: Proportional to evolutionary time
 - **Outgroup**: Rabbit as more distant mammalian relative
+
 ````
 
 #### Advanced Newick Features
@@ -396,6 +388,7 @@ This tree demonstrates:
 ```newick
 ((((A1:0.1,A2:0.15)A:0.2,(B1:0.12,B2:0.08)B:0.25)AB:0.3,((C1:0.09,C2:0.11)C:0.18,(D1:0.13,D2:0.07)D:0.22)CD:0.35)ABCD:0.4,E:0.8); [Complex Gene Family - Multi-level phylogenetic analysis with named internal nodes]
 ```
+
 ````
 
 **Tips for Creating Newick Trees**:
@@ -407,7 +400,7 @@ This tree demonstrates:
 
 ## Configuration Options
 
-### ImageGalleryView Options 
+### SelectImageGalleryView Options 
 
 | Option              | Default | Description                |
 | ------------------- | ------- | -------------------------- |
@@ -417,7 +410,7 @@ This tree demonstrates:
 | `enableLazyLoading` | true    | Use intersection observer  |
 | `validateUrls`      | true    | Validate image URL formats |
 
-### TextualDescriptionsView Options
+### SelectTextualDescriptionsView Options
 
 | Option              | Default | Description                     |
 | ------------------- | ------- | ------------------------------- |
@@ -430,19 +423,19 @@ This tree demonstrates:
 
 ### Components
 
-#### ImageGalleryView
-- **State Model** (`ImageGalleryView/stateModel.ts`): MobX state tree with `updateFeature()` and `clearFeature()` actions
-- **React Component** (`ImageGalleryView/ImageGalleryView.tsx`): Material-UI components with lazy loading
+#### SelectImageGalleryView
+- **State Model** (`SelectImageGalleryView/stateModel.ts`): MobX state tree with `updateFeature()` and `clearFeature()` actions
+- **React Component** (`SelectImageGalleryView/SelectImageGalleryView.tsx`): Material-UI components with lazy loading
 - **Plugin Registration** (`index.ts`): ViewType registration and autorun session monitoring
 
-#### TextualDescriptionsView
-- **State Model** (`TextualDescriptionsView/stateModel.ts`): MobX state tree with feature and content management
-- **React Component** (`TextualDescriptionsView/components/Explainers.tsx`): Markdown rendering with cytoscape integration
+#### SelectTextualDescriptionsView
+- **State Model** (`SelectTextualDescriptionsView/stateModel.ts`): MobX state tree with feature and content management
+- **React Component** (`SelectTextualDescriptionsView/components/Explainers.tsx`): Markdown rendering with cytoscape integration
 - **Plugin Registration** (`index.ts`: ViewType registration and automatic view management
 
 ### Data Flow
 
-#### ImageGalleryView Flow
+#### SelectImageGalleryView Flow
 1. Feature selection triggers autorun in `index.ts`
 2. Image data extracted from feature attributes (`images`, `image_group`, `image_tag`)
 3. Arrays converted to comma-separated strings for state model compatibility
@@ -450,7 +443,7 @@ This tree demonstrates:
 5. React component parses strings back to arrays for display
 6. Images grouped by labels, types displayed as chips
 
-#### TextualDescriptionsView Flow
+#### SelectTextualDescriptionsView Flow
 1. Feature selection triggers autorun in `index.ts`
 2. Markdown data extracted from feature attributes (`markdown_urls`, `descriptions`, `content_type`)
 3. State model stores comma-separated URL strings
@@ -460,12 +453,12 @@ This tree demonstrates:
 
 ### Key Functions
 
-#### ImageGalleryView Functions
+#### SelectImageGalleryView Functions
 - `parseImages()`: Handles both prop and feature attribute sources
 - `groupImagesByLabel()`: Creates collapsible containers per label
 - `LazyImage`: Intersection observer-based loading component
 
-#### TextualDescriptionsView Functions
+#### SelectTextualDescriptionsView Functions
 - `fetchContent()`: Async loading of markdown documents
 - `CytoscapeDirectRender`: Interactive cytoscape diagram renderer
 - `MarkdownComponents`: Custom renderers for tables, code blocks, and diagrams
@@ -491,13 +484,13 @@ filename.jpg
 
 ## Troubleshooting
 
-### Images Not Displaying (ImageGalleryView)
+### Images Not Displaying (SelectImageGalleryView)
 - Verify `image` or `images` attribute exists in GFF features
 - Check image URLs are accessible
 - Ensure CORS headers for cross-domain images
 - Check browser console for errors
 
-### Markdown Not Loading (TextualDescriptionsView)
+### Markdown Not Loading (SelectTextualDescriptionsView)
 - Verify `markdown_urls` or `markdown_url` attribute exists in GFF features
 - Check markdown document URLs are accessible
 - Ensure CORS headers for cross-domain documents
@@ -518,7 +511,7 @@ filename.jpg
 - Check for invalid characters in species names
 
 ### Performance Issues
-- Reduce `maxImages` value for ImageGalleryView
+- Reduce `maxImages` value for SelectImageGalleryView
 - Enable `enableLazyLoading` (default: true) for images
 - Optimize image and document sizes
 - Limit number of markdown documents per feature
