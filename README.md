@@ -29,13 +29,14 @@ Option 1:
 Go to https://github.com/alpapan/jbrowse-plugin-image-gallery/releases
 download the jbrowse-plugin-image-gallery.umd.production.min.js
 
-Option 2:
+Option 2: For developers
 
 
 ```bash
 git clone https://github.com/alpapan/jbrowse-plugin-image-gallery.git
 cd jbrowse-plugin-image-gallery
 npm install
+npm run setup
 # this works on windows too:
 npx cross-env NODE_ENV=production npm run build
 ls -l dist/jbrowse-plugin-image-gallery.umd.production.min.js
@@ -53,6 +54,18 @@ Add to your JBrowse 2 config.json:
   ]
 }
 ```
+
+
+To develop against JBrowse Web:
+
+- Start a development version of JBrowse Web (see
+  [here](https://github.com/GMOD/jbrowse-components/blob/master/CONTRIBUTING.md))
+- In this project, run `yarn start` (or `npm run start`)
+- Assuming JBrowse Web is being served on port 3000, navigate in your web
+  browser to
+  http://localhost:3000/?config=http://localhost:9000/jbrowse_config.json
+- When you make changes to your plugin, it will automatically be re-built. You
+  can then refresh JBrowse Web to see the changes.
 
 ## Dependencies
 

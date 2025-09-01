@@ -231,7 +231,11 @@ export const FeatureSearchAutocomplete: React.FC<
         freeSolo
         disableListWrap
         inputValue={searchInputValue}
-        onInputChange={(_, value) => onSearchInputChange(value || '')}
+        onInputChange={(_, value, reason) => {
+          if (reason !== 'reset' && reason !== 'selectOption') {
+            onSearchInputChange(value || '')
+          }
+        }}
         onChange={(_, value) => {
           if (typeof value === 'object' && value !== null) {
             onFeatureSelect(value)

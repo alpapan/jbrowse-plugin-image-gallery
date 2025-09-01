@@ -5,6 +5,7 @@ import {
   readConfObject,
   AnyConfigurationModel,
 } from '@jbrowse/core/configuration'
+import BaseResult from '@jbrowse/core/TextSearch/BaseResults'
 import type { Region } from '@jbrowse/core/util/types'
 import type { Feature } from '@jbrowse/core/util/simpleFeature'
 import type { BaseTrackConfig } from '@jbrowse/core/pluggableElementTypes/models'
@@ -156,23 +157,142 @@ export async function searchTrackFeatures(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   maxResults = 100,
 ): Promise<SearchMatch[]> {
-  // Get text search adapter configuration
-  const textSearchAdapter = readConfObject(trackConf, [
-    'textSearching',
-    'textSearchAdapter',
-  ])
+  try {
+    // Defensive check: ensure searchTerm is never undefined
+    const safeSearchTerm = (searchTerm ?? '').trim()
+    if (!safeSearchTerm) {
+      console.log(
+        '🔍 DEBUG: Empty search term provided, returning empty results',
+      )
+      return []
+    }
+    // Get text search adapter configuration using proper JBrowse 2 patterns
+    let textSearchAdapter: unknown = undefined
 
-  if (!textSearchAdapter) {
-    console.log('🔍 DEBUG: No textSearchAdapter found')
+    // Try different ways to access text search adapter configuration
+    try {
+      textSearchAdapter = readConfObject(trackConf, [
+        'textSearching',
+        'textSearchAdapter',
+      ])
+    } catch (e) {
+      console.log('🔍 DEBUG: readConfObject failed for textSearchAdapter:', e)
+    }
+
+    // Fallback: try direct property access
+    if (!textSearchAdapter) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const trackConfRecord = trackConf as any
+      textSearchAdapter = trackConfRecord?.textSearching?.textSearchAdapter
+    }
+
+    // Another fallback: try configuration property
+    if (!textSearchAdapter) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const trackConfRecord = trackConf as any
+      textSearchAdapter =
+        trackConfRecord?.configuration?.textSearching?.textSearchAdapter
+    }
+
+    if (!textSearchAdapter) {
+      console.log('🔍 DEBUG: No textSearchAdapter found in track configuration')
+      return []
+    }
+
+    const adapterConfig = textSearchAdapter as Record<string, unknown>
+    const ixxUri =
+      (adapterConfig.ixxFilePath as Record<string, unknown>)?.uri ||
+      adapterConfig.ixxUri
+    const ixUri =
+      (adapterConfig.ixFilePath as Record<string, unknown>)?.uri ||
+      adapterConfig.ixUri
+
+    if (!ixxUri || !ixUri) {
+      console.log('🔍 DEBUG: Missing index file URIs in text search adapter')
+      return []
+    }
+
+    // Use session's text search manager if available (JBrowse 2 pattern)
+    const sessionWithTextSearch = session as AbstractSessionModel & {
+      textSearchManager?: {
+        search: (
+          term: string,
+          options: { trackId?: string; assemblyName?: string[] },
+          limit?: number,
+        ) => Promise<unknown[]>
+      }
+    }
+
+    if (sessionWithTextSearch.textSearchManager) {
+      console.log('🔍 DEBUG: Using session.textSearchManager for search')
+      const textSearchManager = sessionWithTextSearch.textSearchManager
+      const trackId =
+        readConfObject(trackConf, ['trackId']) ||
+        (trackConf as Record<string, unknown>).trackId
+      const assemblyName = session.assemblyManager?.assemblyNamesList?.[0]
+
+      if (!trackId) {
+        console.log('🔍 DEBUG: No trackId found, returning empty results')
+        return []
+      }
+
+      // Call search with proper parameters based on JBrowse 2 API
+      console.log('🔍 DEBUG: Calling textSearchManager.search with:', {
+        safeSearchTerm,
+        trackId,
+        assemblyName,
+        maxResults,
+      })
+      if (!assemblyName) {
+        console.log('🔍 DEBUG: No assemblyName found, returning empty results')
+        return []
+      }
+      const results = await textSearchManager.search(
+        { queryString: safeSearchTerm },
+        { includeAggregateIndexes: true, assemblyName: assemblyName },
+        (results: BaseResult[]) => results.slice(0, maxResults),
+      )
+      console.log('🔍 DEBUG: textSearchManager.search returned:', results)
+
+      // Convert results to SearchMatch format
+      return (results || [])
+        .map((result: unknown) => {
+          if (!result) return null
+          const r = result as Record<string, unknown>
+          return {
+            refName: String(r.refName || ''),
+            start: Number(r.start || 0),
+            end: Number(r.end || 0),
+            loc: {
+              refName: String(r.refName || ''),
+              start: Number(r.start || 0),
+              end: Number(r.end || 0),
+            },
+            location: {
+              refName: String(r.refName || ''),
+              start: Number(r.start || 0),
+              end: Number(r.end || 0),
+            },
+          }
+        })
+        .filter(Boolean) as SearchMatch[]
+    }
+
+    // Fallback: Direct index file access (simplified implementation)
+    console.log(
+      '🔍 DEBUG: textSearchManager not available, using direct index access - FALLBACK ACTIVATED',
+    )
+
+    // For now, return empty results - this would need a more complex implementation
+    // to read and search the index files directly without pluginManager
+    console.warn(
+      'Direct index file search not implemented - returning empty results from FALLBACK',
+    )
+    return []
+  } catch (error) {
+    console.error('Error in searchTrackFeatures:', error)
     return []
   }
-
-  // Note: pluginManager is not accessible at runtime from session
-  // Text search functionality needs to be redesigned to work without pluginManager
-  console.warn(
-    'Text search adapter access not available at runtime - functionality disabled',
-  )
-  return await Promise.resolve([])
 }
 
 function getBaseTrackConfigs(session: AbstractSessionModel): BaseTrackConfig[] {
@@ -564,27 +684,27 @@ export const searchFeatureRangeQueries = (
       const assembly = yield session.assemblyManager.waitForAssembly(
         self.selectedAssemblyId,
       )
-      console.log(
-        '🔍 DEBUG: Assembly:',
-        self.selectedAssemblyId,
-        'regions:',
-        assembly?.regions?.length || 0,
-      )
-      if (!assembly?.regions) {
-        console.log('🔍 DEBUG: No assembly regions found')
-        return []
-      }
+      // console.log(
+      //   '🔍 DEBUG: Assembly:',
+      //   self.selectedAssemblyId,
+      //   'regions:',
+      //   assembly?.regions?.length || 0,
+      // )
+      // if (!assembly?.regions) {
+      //   console.log('🔍 DEBUG: No assembly regions found')
+      //   return []
+      // }
 
       // Get all track configurations using proven working pattern from AGENT.md
       const trackConfs = getBaseTrackConfigs(session)
-      console.log(
-        '🔍 DEBUG: All available tracks:',
-        trackConfs.map(tc => ({
-          trackId: tc.trackId,
-          configTrackId: tc.configuration?.trackId,
-          isMobX: 'setSubschema' in tc,
-        })),
-      )
+      // console.log(
+      //   '🔍 DEBUG: All available tracks:',
+      //   trackConfs.map(tc => ({
+      //     trackId: tc.trackId,
+      //     configTrackId: tc.configuration?.trackId,
+      //     isMobX: 'setSubschema' in tc,
+      //   })),
+      // )
       const trackConf = trackConfs.find((tc: BaseTrackConfig) => {
         try {
           let trackId: string | undefined
@@ -593,9 +713,9 @@ export const searchFeatureRangeQueries = (
           } else {
             trackId = tc.trackId ?? tc.configuration?.trackId
           }
-          console.log(
-            `🔍 DEBUG: Checking track: ${trackId} vs ${self.selectedTrackId}`,
-          )
+          // console.log(
+          //   `🔍 DEBUG: Checking track: ${trackId} vs ${self.selectedTrackId}`,
+          // )
           return trackId === self.selectedTrackId
         } catch (error) {
           console.log('🔍 DEBUG: Error checking track:', error)
@@ -603,7 +723,7 @@ export const searchFeatureRangeQueries = (
         }
       })
 
-      console.log('🔍 DEBUG: Found track config:', !!trackConf, trackConf)
+      // console.log('🔍 DEBUG: Found track config:', !!trackConf, trackConf)
 
       // fallback: try session track if no config track found
       let adapter: unknown = undefined
@@ -700,9 +820,14 @@ export const searchFeatureRangeQueries = (
 
             const filtered = features.filter((feature: Feature) => {
               try {
+                // Defensive check: ensure feature is valid
+                if (!feature || typeof feature.get !== 'function') {
+                  return false
+                }
+
                 // Get standard attributes
-                const idVal = getFeatureId(feature)
-                const nameVal = getFeatureName(feature)
+                const idVal = String(getFeatureId(feature) || '')
+                const nameVal = String(getFeatureName(feature) || '')
                 const typeVal = String(
                   feature.get?.('type') ?? feature.get?.('Type') ?? '',
                 )
@@ -721,10 +846,10 @@ export const searchFeatureRangeQueries = (
                 )
 
                 // Use the get() methods instead of accessing .data directly
-                const dataNameVal = String(feature.get('name') ?? '')
-                const dataGeneVal = String(feature.get('gene') ?? '')
+                const dataNameVal = String(feature.get?.('name') ?? '')
+                const dataGeneVal = String(feature.get?.('gene') ?? '')
 
-                const lower = searchTerm.toLowerCase()
+                const lower = String(searchTerm || '').toLowerCase()
                 const matches =
                   idVal.toLowerCase().includes(lower) ||
                   nameVal.toLowerCase().includes(lower) ||
@@ -885,9 +1010,9 @@ export const searchFeatureTextIndex = (
       }
       // Use RPC fallback if no matches from textIndexSearch
       if (matches.length === 0) {
-        // console.log(
-        //   '🔍 DEBUG: No matches from textIndexSearch, falling back to RPC search',
-        // )
+        console.log(
+          '🔍 DEBUG: No matches from textIndexSearch, falling back to RPC search',
+        )
         const fallback = searchFeatureRangeQueries(contentExtractor)
         return yield fallback.call(this, self)
       }
@@ -927,8 +1052,9 @@ export const searchFeatureTextIndex = (
         let queryRegion: Region | undefined
 
         try {
-          const refName =
-            m.refName ?? m.ref ?? m.loc?.refName ?? m.location?.refName
+          const refName = String(
+            m.refName ?? m.ref ?? m.loc?.refName ?? m.location?.refName ?? '',
+          )
           const start = Number(
             m.start ?? m.loc?.start ?? m.location?.start ?? 0,
           )

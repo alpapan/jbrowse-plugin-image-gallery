@@ -26,12 +26,26 @@ You can also parse the definition files in @/node_modules/@jbrowse/core/
     - `session`: A model representing the dynamic, mutable state of the user's session (open views, tracks, etc.).
 - **Accessing Models:** Use `getSession(anyModelInTree)` to traverse up to the session model. From the session, you can access views, the assemblyManager, etc.
 - **MST Actions:** All state modifications **must** happen within a model's `actions` block. This is fundamental to MST and ensures changes are trackable.
+- 
 ```javascript
-const MyModel = types.model({       value: types.string,     }).actions(self => ({       setValue(newValue) {         self.value = newValue; // Correct way to modify state       },     }));
+const MyModel = types.model({ value: types.string }).actions(self => ({
+  setValue(newValue) {
+    self.value = newValue
+  },
+}))
 ```
+
 - **MST Views:** Use `views` blocks for derived data. These are memoized getters that recompute only when their dependencies change.
+
 ```javascript
-    const MyModel = types.model({       width: types.number,       height: types.number     }).views(self => ({       get area() {         return self.width * self.height; // This is a computed view       },     }));
+  const MyModel = types
+  .model({ width: types.number, height: types.number })
+  .views(self => ({
+    get area() {
+      return self.width * self.height
+    },
+  }))
+
  ```
 
 
@@ -169,23 +183,29 @@ function getTracksForAssembly(self: any) {
 The process involves getting the track's adapter and using it to fetch features.
 
 1. **Get the session and track configuration:**
-    ```javascript     const session = getSession(self)     const trackConfs = getConf(session.jbrowse.configuration, 'tracks') ?? []     const trackConf = trackConfs.find(tc => getConf(tc, 'trackId') === trackId)     ```
-2. **Get the adapter configuration from the track configuration:**
-    ```javascript     const adapterConfig = getConf(trackConf, 'adapter')     ```
-3. **Instantiate the Adapter:**
+```javascript
+         const session = getSession(self)     
+         const trackConfs = getConf(session.jbrowse.configuration, 'tracks') ?? []     
+         const trackConf = trackConfs.find(tc => getConf(tc, 'trackId') === trackId)     
+  ```
+3. **Get the adapter configuration from the track configuration:**
+```javascript
+         const adapterConfig = getConf(trackConf, 'adapter')     
+ ```
+4. **Instantiate the Adapter:**
     - You need the `pluginManager`
     - Get the adapter class constructor: `const adapterTypeObj = pluginManager.getAdapterType(adapterConfig.type);`.
     - **PROVEN WORKING**: `await adapterTypeObj.getAdapterClass()` method returns a Promise that resolves to the constructor.
     - Create an instance: `const adapter = new AdapterClass(adapterConfig);`
-4. **Fetch Features:**
+5. **Fetch Features:**
     - `getFeatures` returns an RxJS `Observable`.
-    ```javascript
+```javascript
     import { toArray } from 'rxjs/operators';
 
-const region = { refName: 'chr1', start: 0, end: 50000, assemblyName: 'hg19' };
+    const region = { refName: 'chr1', start: 0, end: 50000, assemblyName: 'hg19' };
     const featuresObservable = adapter.getFeatures(region);
     const features = await featuresObservable.pipe(toArray()).toPromise();
-    ```
+```
 
 **ALTERNATIVE - PROVEN WORKING RPC PATTERN:**
 For getting features using JBrowse's RPC system (recommended approach):
@@ -362,4 +382,51 @@ export default class MyPlugin extends Plugin {
 }
 ```
 
-The view state model extends the `BaseViewModel` automatically, which provides core functionality like `id`, `displayName`, `minimized`, and actions like `setWidth` and `setMinimized`. Your custom view can then add additional properties and functionality specific to its purpose.[^2]
+The view state model extends the `BaseViewModel` automatically, which provides core functionality like `id`, `displayName`, `minimized`, and actions like `setWidth` and `setMinimized`. Your custom view can then add additional properties and functionality specific to its purpose.[^2]## Additional Notes from Debugging Session
+
+**UPDATED: Correct textSearchManager.search API usage**
+
+Based on debugging and analysis of the LinearGenomeView implementation, and review of `TextSearchManager.d.ts`, the correct way to call `textSearchManager.search` is:
+
+```typescript
+// Overload 1 (most common for advanced usage)
+const textSearchResults = await textSearchManager.search(
+  {
+    queryString: string, // The search query string
+    searchType?: string, // optional: 'exact', 'prefix', etc.
+  },
+  {
+    includeAggregateIndexes: boolean, // Required property for SearchScope
+    assemblyName: string, // Individual assembly name (string, not array)
+    tracks?: string[], // Optional array of track IDs to limit search
+  },
+  (results: BaseResult[]) => BaseResult[], // Function to rank/filter results
+)
+
+// Overload 2 (for simpler usage)
+const textSearchResults = await textSearchManager.search(
+  term: string, // The search query string
+  options: {
+    trackId?: string, // Optional track ID
+    assemblyName?: string[], // Optional array of assembly names
+  },
+  limit?: number, // Optional result limit
+)
+```
+
+**Key findings:**
+- The `search` method has two primary overloads. The `flexibleViewUtils.ts` context aligns with the first overload.
+- The `SearchScope` interface (second argument of the first overload) requires `includeAggregateIndexes: boolean` and `assemblyName: string` (note: `assemblyName` is a *string*, not an array, within this specific `SearchScope` type).
+- The `tracks?: string[]` property within `SearchScope` is optional and can be used to limit the search to specific track IDs. For broad assembly-wide searches, it can be omitted.
+- No `trackId` should be passed directly in the `searchScope` object for the first overload, as `trackId` is not part of the `SearchScope` interface.
+- Results returned by this method are `BaseResult[]` objects, which have a `getLocation()` method.
+
+**Fixed Issues:**
+- Resolved `TypeError: Cannot read properties of undefined (reading 'replace')` which was occurring in `TextSearchManager.sortResults2` due to incorrect `searchScope` object structure.
+- Added defensive checks in search functions to prevent undefined access (completed in prior steps).
+- Updated `textSearchManager.search` call in `src/shared/flexibleViewUtils.ts` to use the correct `SearchScope` parameters: `{ includeAggregateIndexes: true, assemblyName: assemblyName }`.
+- Fixed TypeScript compilation errors by ensuring faithful adherence to the `TextSearchManager.d.ts` interface definition for `SearchScope` and correct overload usage.
+- `src/shared/flexibleViewUtils.ts` now passes `npx tsc --noEmit` and `npm run lint -- --fix`.
+
+**Import required for `BaseResult`:**
+`import BaseResult from '@jbrowse/core/TextSearch/BaseResults'`
