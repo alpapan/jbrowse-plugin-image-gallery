@@ -594,10 +594,11 @@ export const SelectTextualDescriptionsViewF: React.FC<TextualDescriptionsViewPro
           className="MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation12 css-4h24oc-MuiPaper-root-viewContainer-unfocusedView"
         >
           <Typography variant="h6" color="textSecondary">
-            No feature with textual descriptions selected
+            No selected feature with text descriptions
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            When you select a feature with textual content, it will appear here
+            When you select a feature with stored text content, it will appear
+            here
           </Typography>
         </Paper>
       )

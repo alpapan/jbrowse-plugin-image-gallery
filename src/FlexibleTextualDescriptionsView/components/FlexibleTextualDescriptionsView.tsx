@@ -1,23 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { observer } from 'mobx-react'
-import {
-  Button,
-  TextField,
-  Box,
-  Typography,
-  CircularProgress,
-  Alert,
-  Paper,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Autocomplete,
-} from '@mui/material'
-import SearchIcon from '@mui/icons-material/Search'
-import ClearIcon from '@mui/icons-material/Clear'
+import { Box, Typography } from '@mui/material'
 import { SelectTextualDescriptionsViewF } from '../../SelectTextualDescriptionsView/components/Explainers'
-import { getAssemblyDisplayName } from '../stateModel'
+import {
+  AssemblySelector,
+  TrackSelector,
+  FeatureSearchAutocomplete,
+  FlexibleViewContainer,
+  InstructionsPanel,
+  ErrorDisplay,
+  ClearSelectionsButton,
+} from '../../shared/components/FlexibleViewSelectors'
 
 interface FeatureOption {
   id: string
@@ -97,6 +90,7 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
   observer(({ model }) => {
     const [error, setError] = useState<string | null>(null)
     const [searchInputValue, setSearchInputValue] = useState('')
+
     const searchHandler = useCallback(
       (value: string) => {
         model.setSearchTerm(value)
@@ -145,7 +139,14 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
     }, [model.searchTerm, searchInputValue])
 
     const handleAssemblyChange = (assemblyId: string) => {
-      model.setSelectedAssembly(assemblyId ?? undefined)
+      console.log('🎯 DEBUG: TextualDescriptionsView handleAssemblyChange called with:', assemblyId)
+      console.log('🎯 DEBUG: model.setSelectedAssembly exists:', typeof model.setSelectedAssembly)
+      console.log('🎯 DEBUG: model object:', Object.keys(model))
+      if (typeof model.setSelectedAssembly === 'function') {
+        model.setSelectedAssembly(assemblyId ?? undefined)
+      } else {
+        console.error('🎯 DEBUG: model.setSelectedAssembly is not a function!', typeof model.setSelectedAssembly)
+      }
     }
 
     const handleTrackChange = (trackId: string) => {
@@ -185,205 +186,58 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
       setError(null)
     }
 
-    return (
-      <Paper sx={{ p: 2, m: 1 }} elevation={1}>
-        <Typography variant="h6" gutterBottom>
-          {model.displayTitle}
-        </Typography>
+    const hasSelections = Boolean(
+      model.selectedTrackId ?? model.selectedFeatureId ?? model.hasSearchTerm,
+    )
 
+    return (
+      <FlexibleViewContainer model={model}>
         {/* Assembly Selection */}
-        <Box sx={{ mb: 2 }}>
-          <FormControl fullWidth>
-            <InputLabel id="assembly-select-label">Select Assembly</InputLabel>
-            <Select
-              labelId="assembly-select-label"
-              id="assembly-select"
-              value={model.selectedAssemblyId ?? ''}
-              label="Select Assembly"
-              onChange={e => handleAssemblyChange(e.target.value)}
-            >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {model.availableAssemblies.map(assembly => (
-                <MenuItem key={assembly.name} value={assembly.name}>
-                  {getAssemblyDisplayName(assembly)}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          {model.availableAssemblies.length === 0 && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mt: 1, display: 'block' }}
-            >
-              No assemblies available in this session
-            </Typography>
-          )}
-        </Box>
+        <AssemblySelector
+          selectedAssemblyId={model.selectedAssemblyId}
+          availableAssemblies={model.availableAssemblies}
+          onAssemblyChange={handleAssemblyChange}
+        />
 
         {/* Track Selection */}
-        <Box sx={{ mb: 2 }}>
-          <FormControl fullWidth>
-            <InputLabel id="track-select-label">Select Track</InputLabel>
-            <Select
-              labelId="track-select-label"
-              id="track-select"
-              value={model.selectedTrackId ?? ''}
-              label="Select Track"
-              onChange={e => handleTrackChange(e.target.value)}
-              disabled={!model.selectedAssemblyId || model.isLoadingTracks}
-            >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {model.availableTracks.map(track => (
-                <MenuItem key={track.trackId} value={track.trackId}>
-                  {String(track.name || track.trackId)}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          {!model.selectedAssemblyId && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mt: 1, display: 'block' }}
-            >
-              Select an assembly first to view available tracks
-            </Typography>
-          )}
-          {model.selectedAssemblyId && model.availableTracks.length === 0 && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mt: 1, display: 'block' }}
-            >
-              No compatible tracks available for selected assembly
-            </Typography>
-          )}
-        </Box>
+        <TrackSelector
+          selectedTrackId={model.selectedTrackId}
+          availableTracks={model.availableTracks}
+          onTrackChange={handleTrackChange}
+          selectedAssemblyId={model.selectedAssemblyId}
+          isLoadingTracks={model.isLoadingTracks}
+        />
 
         {/* Feature Search */}
-        {model.selectedTrackId && (
-          <Box sx={{ mb: 2 }}>
-            <Autocomplete
-              key={`search-${model.selectedTrackId}`}
-              freeSolo
-              disableListWrap
-              inputValue={searchInputValue}
-              onInputChange={(_, value) => searchHandler(value || '')}
-              onChange={(_, value) => {
-                if (typeof value === 'object' && value !== null) {
-                  handleFeatureSelect(value)
-                } else {
-                  handleFeatureSelect(null)
-                }
-              }}
-              options={model.features || []}
-              getOptionLabel={option => {
-                if (typeof option === 'string') return option
-                return `${option.name ?? option.id} (${option.type})`
-              }}
-              loading={model.isSearching}
-              disabled={!model.canSearch}
-              renderInput={params => {
-                const { InputProps, ...restParams } = params
-                return (
-                  <TextField
-                    {...restParams}
-                    label="Search Features"
-                    placeholder="Type to search for features..."
-                    InputProps={{
-                      ...InputProps,
-                      endAdornment: (
-                        <>
-                          {model.isSearching && (
-                            <CircularProgress color="inherit" size={20} />
-                          )}
-                          {InputProps?.endAdornment}
-                        </>
-                      ),
-                    }}
-                  />
-                )
-              }}
-              renderOption={(props, option) => (
-                <Box component="li" {...props}>
-                  <Box>
-                    <Typography variant="body2">
-                      <strong>{option.name ?? option.id}</strong>
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {option.type}
-                      {option.location && ` • ${option.location}`}
-                    </Typography>
-                    {option.description && (
-                      <Typography
-                        variant="caption"
-                        display="block"
-                        color="text.secondary"
-                      >
-                        {option.description.length > 100
-                          ? `${option.description.substring(0, 100)}...`
-                          : option.description}
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
-              )}
-              noOptionsText={
-                !model.hasSearchTerm
-                  ? 'Start typing to search features...'
-                  : model.isSearching
-                  ? 'Searching...'
-                  : 'No features found'
-              }
-              ListboxProps={{
-                style: { maxHeight: '200px' },
-              }}
-            />
-            {!model.canSearch && model.selectedTrackId && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: 1, display: 'block' }}
-              >
-                Text search not available for this track
-              </Typography>
-            )}
-          </Box>
-        )}
+        <FeatureSearchAutocomplete
+          searchInputValue={searchInputValue}
+          onSearchInputChange={value => {
+            setSearchInputValue(value)
+            searchHandler(value)
+          }}
+          features={model.features}
+          onFeatureSelect={handleFeatureSelect}
+          isSearching={model.isSearching}
+          canSearch={model.canSearch}
+          selectedTrackId={model.selectedTrackId}
+          hasSearchTerm={model.hasSearchTerm}
+          contentType="textual"
+        />
 
         {/* Error Display */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+        <ErrorDisplay error={error} />
 
         {/* Clear Button */}
-        {(model.selectedTrackId ??
-          model.selectedFeatureId ??
-          model.hasSearchTerm) && (
-          <Box sx={{ mb: 2 }}>
-            <Typography
-              variant="body2"
-              color="primary"
-              sx={{ cursor: 'pointer', textDecoration: 'underline' }}
-              onClick={handleClearSelections}
-            >
-              Clear Selections
-            </Typography>
-          </Box>
-        )}
+        <ClearSelectionsButton
+          hasSelections={hasSelections}
+          onClear={handleClearSelections}
+        />
 
         {/* Content Display */}
         {model.selectedFeatureId && model.isReady && (
           <Box sx={{ mt: 2 }}>
             {model.hasContent ? (
-              // Use the existing Explainers component for content display
+              // Use the existing TextualDescriptionsView component for content display
               <SelectTextualDescriptionsViewF
                 model={{
                   hasContent: model.hasContent,
@@ -416,45 +270,17 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
         )}
 
         {/* Instructions */}
-        {!model.selectedAssemblyId && (
-          <Box
-            sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}
-          >
-            <Typography variant="body2" color="text.secondary">
-              Select an assembly from the dropdown above to begin browsing
-              tracks and features independently of the main JBrowse selection.
-            </Typography>
-          </Box>
-        )}
-
-        {model.selectedAssemblyId && !model.selectedTrackId && (
-          <Box
-            sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}
-          >
-            <Typography variant="body2" color="text.secondary">
-              Select a track from the &ldquo;
-              {getAssemblyDisplayName(model.selectedAssembly) || 'selected'}
-              &rdquo; assembly to view available features.
-            </Typography>
-          </Box>
-        )}
-
-        {model.selectedTrackId &&
-          !model.selectedFeatureId &&
-          !model.hasSearchTerm &&
-          !model.isSearching && (
-            <Box
-              sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}
-            >
-              <Typography variant="body2" color="text.secondary">
-                Start typing in the search box above to find features from the
-                &ldquo;
-                {model.selectedTrack?.name ?? 'selected'}&rdquo; track and view
-                their textual descriptions.
-              </Typography>
-            </Box>
-          )}
-      </Paper>
+        <InstructionsPanel
+          selectedAssemblyId={model.selectedAssemblyId}
+          selectedTrackId={model.selectedTrackId}
+          selectedFeatureId={model.selectedFeatureId}
+          hasSearchTerm={model.hasSearchTerm}
+          isSearching={model.isSearching}
+          selectedAssembly={model.selectedAssembly}
+          selectedTrack={model.selectedTrack}
+          contentType="textual"
+        />
+      </FlexibleViewContainer>
     )
   })
 

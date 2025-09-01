@@ -9,7 +9,9 @@
     {
       "name": "hg19",
       "displayName": "Homo sapiens (hg19)",
-      "aliases": ["GRCh37"],
+      "aliases": [
+        "GRCh37"
+      ],
       "sequence": {
         "type": "ReferenceSequenceTrack",
         "trackId": "Pd8Wh30ei9R",
@@ -54,7 +56,9 @@
     {
       "name": "hg38",
       "displayName": "Homo sapiens (hg38)",
-      "aliases": ["GRCh38"],
+      "aliases": [
+        "GRCh38"
+      ],
       "sequence": {
         "type": "ReferenceSequenceTrack",
         "trackId": "P6R5xbRqRr",
@@ -98,8 +102,12 @@
       "type": "FeatureTrack",
       "trackId": "ncbi_gff_hg19_demo",
       "name": "NCBI RefSeq (demo)",
-      "assemblyNames": ["hg19"],
-      "category": ["Annotation"],
+      "assemblyNames": [
+        "hg19"
+      ],
+      "category": [
+        "Annotation"
+      ],
       "metadata": {
         "source": "https://www.ncbi.nlm.nih.gov/genome/guide/human/",
         "dateaccessed": "12/03/2020"
@@ -107,14 +115,35 @@
       "adapter": {
         "type": "Gff3TabixAdapter",
         "gffGzLocation": {
-          "uri": "http://localhost:9000/test.gff3.gz",
+          "uri": "http://localhost:8999/test_data/alexie/test.gff3.gz",
           "locationType": "UriLocation"
         },
         "index": {
           "location": {
-            "uri": "http://localhost:9000/test.gff3.gz.tbi",
+            "uri": "http://localhost:8999/test_data/alexie/test.gff3.gz.tbi",
             "locationType": "UriLocation"
           }
+        }
+      },
+      "textSearching": {
+        "textSearchAdapter": {
+          "type": "TrixTextSearchAdapter",
+          "textSearchAdapterId": "ncbi_gff_hg19_demo-index",
+          "ixFilePath": {
+            "uri": "http://localhost:8999/trix/ncbi_gff_hg19_demo.ix",
+            "locationType": "UriLocation"
+          },
+          "ixxFilePath": {
+            "uri": "http://localhost:8999/trix/ncbi_gff_hg19_demo.ixx",
+            "locationType": "UriLocation"
+          },
+          "metaFilePath": {
+            "uri": "http://localhost:8999/trix/ncbi_gff_hg19_demo_meta.json",
+            "locationType": "UriLocation"
+          },
+          "assemblyNames": [
+            "hg19"
+          ]
         }
       }
     }
@@ -122,24 +151,25 @@
   "defaultSession": {
     "name": "New Session"
   },
-  
   "aggregateTextSearchAdapters": [
     {
       "type": "TrixTextSearchAdapter",
       "textSearchAdapterId": "hg19-index",
       "ixFilePath": {
-        "uri": "https://jbrowse.org/genomes/hg19/trix/hg19.ix",
+        "uri": "http://localhost:8999/trix/hg19.ix",
         "locationType": "UriLocation"
       },
       "ixxFilePath": {
-        "uri": "https://jbrowse.org/genomes/hg19/trix/hg19.ixx",
+        "uri": "http://localhost:8999/trix/hg19.ixx",
         "locationType": "UriLocation"
       },
       "metaFilePath": {
-        "uri": "https://jbrowse.org/genomes/hg19/trix/meta.json",
+        "uri": "http://localhost:8999/trix/hg19_meta.json",
         "locationType": "UriLocation"
       },
-      "assemblyNames": ["hg19"]
+      "assemblyNames": [
+        "hg19"
+      ]
     },
     {
       "type": "TrixTextSearchAdapter",
@@ -156,7 +186,9 @@
         "uri": "https://jbrowse.org/genomes/GRCh38/trix/meta.json",
         "locationType": "UriLocation"
       },
-      "assemblyNames": ["hg38"]
+      "assemblyNames": [
+        "hg38"
+      ]
     }
   ]
 }

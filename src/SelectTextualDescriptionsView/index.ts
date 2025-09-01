@@ -1,2 +1,2 @@
-export { default as ReactComponent } from './components/Explainers'
+export { default as ReactComponent } from './components/TextualDescriptionsView'
 export { default as stateModel } from './stateModel'

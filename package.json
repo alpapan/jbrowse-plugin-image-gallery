@@ -33,7 +33,7 @@
     "build": "rollup --config",
     "browse": "npm-run-all jbrowse:*",
     "jbrowse:configure": "shx cp jbrowse_config.json .jbrowse/config.json",
-    "jbrowse:serve": "cross-var serve --listen $npm_package_config_browse_port .jbrowse",
+    "jbrowse:serve": "cross-var serve --cors --listen $npm_package_config_browse_port .jbrowse",
     "test": "jest",
     "test:e2e": "cross-var start-test \"npm-run-all --parallel start browse\" \"$npm_package_config_port|$npm_package_config_browse_port\" \"npm-run-all cypress:run\"",
     "test:e2e:docker": "npm-run-all --parallel start browse \"cypress:docker\"",
@@ -98,9 +98,6 @@
     "ts-jest": "29.1.1",
     "ts-node": "10.3.0",
     "tss-react": "4.8.6"
-  },
-  "peerDependencies": {
-    "@jbrowse/core": "^2.0.0"
   },
   "module": "dist/index.esm.js",
   "typings": "dist/index.d.ts",

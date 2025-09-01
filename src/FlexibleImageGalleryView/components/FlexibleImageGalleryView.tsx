@@ -1,23 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react'
-import {
-  Typography,
-  Paper,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Box,
-  CircularProgress,
-  Alert,
-  TextField,
-  // Autocomplete,
-} from '@mui/material'
+import React, { useState, useEffect, useCallback } from 'react'
+import { Box, Typography } from '@mui/material'
 import { observer } from 'mobx-react'
 import ImageGalleryView from '../../SelectImageGalleryView/components/ImageGalleryView'
-import { getAssemblyDisplayName } from '../stateModel'
-
-// Constants
-const SEARCH_DEBOUNCE_MS = 300
+import {
+  AssemblySelector,
+  TrackSelector,
+  FeatureSearchAutocomplete,
+  FlexibleViewContainer,
+  InstructionsPanel,
+  ErrorDisplay,
+  ClearSelectionsButton,
+} from '../../shared/components/FlexibleViewSelectors'
 
 interface FeatureOption {
   id: string
@@ -77,6 +70,11 @@ interface FlexibleImageGalleryViewProps {
     features: FeatureOption[]
     setSelectedAssembly: (assemblyId: string | undefined) => void
     setSelectedTrack: (trackId: string | undefined) => void
+    setSearchTerm: (term: string) => void
+    searchFeatures: () => void
+    clearSearch: () => void
+    // Feature selection with image data fetching
+    selectFeatureWithImageData: (featureId: string | undefined) => void
     setSelectedFeature: (
       featureId: string | undefined,
       featureType?: string,
@@ -86,12 +84,6 @@ interface FlexibleImageGalleryViewProps {
     ) => void
     clearSelections: () => void
     setLoadingFeatures: (loading: boolean) => void
-    // Text search related methods
-    setSearchText: (term: string) => void
-    searchFeatures: () => void
-    clearSearch: () => void
-    // Feature selection with image data fetching
-    selectFeatureWithImageData: (featureId: string | undefined) => void
   }
 }
 
@@ -99,36 +91,25 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
   observer(({ model }) => {
     const [error, setError] = useState<string | null>(null)
     const [searchInputValue, setSearchInputValue] = useState('')
-    const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-    const isUpdatingSearchRef = useRef(false)
 
-    // Cleanup timeout on unmount
+    const searchHandler = useCallback(
+      (value: string) => {
+        model.setSearchTerm(value)
+        if (value.trim()) {
+          model.searchFeatures()
+        } else {
+          model.clearSearch()
+        }
+      },
+      [model],
+    )
+
+    // Cleanup on unmount
     useEffect(() => {
       return () => {
-        if (debounceTimeoutRef.current) {
-          clearTimeout(debounceTimeoutRef.current)
-        }
+        model.clearSearch()
       }
-    }, [])
-
-    // Debounced search effect
-    useEffect(() => {
-      if (!searchInputValue?.trim()) {
-        return
-      }
-
-      const timeoutId = setTimeout(() => {
-        if (isUpdatingSearchRef.current) {
-          return // Skip if we're updating from model changes
-        }
-
-        //console.log('🔍 Debounced search executing with:', searchInputValue)
-        model.setSearchText(searchInputValue)
-        // Search is automatically triggered by the model when searchTerm changes
-      }, SEARCH_DEBOUNCE_MS)
-
-      return () => clearTimeout(timeoutId)
-    }, [searchInputValue, model])
+    }, [model])
 
     // Clear selected feature if it no longer exists in features list
     useEffect(() => {
@@ -144,15 +125,10 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
 
     // Sync search input when model search term changes externally
     useEffect(() => {
-      // Only sync if we're not the ones updating the search term
-      if (
-        !isUpdatingSearchRef.current &&
-        model.searchTerm !== searchInputValue
-      ) {
+      if (model.searchTerm !== searchInputValue) {
         setSearchInputValue(model.searchTerm ?? '')
       }
-      isUpdatingSearchRef.current = false
-    }, [model.searchTerm])
+    }, [model.searchTerm, searchInputValue])
 
     const handleAssemblyChange = (assemblyId: string) => {
       model.setSelectedAssembly(assemblyId ?? undefined)
@@ -190,175 +166,52 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
       setError(null)
     }
 
-    return (
-      <Paper sx={{ p: 2, m: 1 }} elevation={1}>
-        <Typography variant="h6" gutterBottom>
-          {model.displayTitle}
-        </Typography>
+    const hasSelections = Boolean(
+      model.selectedTrackId ?? model.selectedFeatureId ?? model.hasSearchTerm,
+    )
 
+    return (
+      <FlexibleViewContainer model={model}>
         {/* Assembly Selection */}
-        <Box sx={{ mb: 2 }}>
-          <FormControl fullWidth>
-            <InputLabel id="assembly-select-label">Select Assembly</InputLabel>
-            <Select
-              labelId="assembly-select-label"
-              id="assembly-select"
-              value={model.selectedAssemblyId ?? ''}
-              label="Select Assembly"
-              onChange={e => handleAssemblyChange(e.target.value)}
-            >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {model.availableAssemblies.map(assembly => (
-                <MenuItem key={assembly.name} value={assembly.name}>
-                  {getAssemblyDisplayName(assembly)}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          {model.availableAssemblies.length === 0 && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mt: 1, display: 'block' }}
-            >
-              No assemblies available in this session
-            </Typography>
-          )}
-        </Box>
+        <AssemblySelector
+          selectedAssemblyId={model.selectedAssemblyId}
+          availableAssemblies={model.availableAssemblies}
+          onAssemblyChange={handleAssemblyChange}
+        />
 
         {/* Track Selection */}
-        <Box sx={{ mb: 2 }}>
-          <FormControl fullWidth>
-            <InputLabel id="track-select-label">Select Track</InputLabel>
-            <Select
-              labelId="track-select-label"
-              id="track-select"
-              value={model.selectedTrackId ?? ''}
-              label="Select Track"
-              onChange={e => handleTrackChange(e.target.value)}
-              disabled={!model.selectedAssemblyId || model.isLoadingTracks}
-            >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {model.availableTracks.map(track => (
-                <MenuItem key={track.trackId} value={track.trackId}>
-                  {String(track.name || track.trackId)}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          {!model.selectedAssemblyId && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mt: 1, display: 'block' }}
-            >
-              Select an assembly first to view available tracks
-            </Typography>
-          )}
-          {model.selectedAssemblyId && model.availableTracks.length === 0 && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mt: 1, display: 'block' }}
-            >
-              No compatible tracks available for selected assembly
-            </Typography>
-          )}
-        </Box>
+        <TrackSelector
+          selectedTrackId={model.selectedTrackId}
+          availableTracks={model.availableTracks}
+          onTrackChange={handleTrackChange}
+          selectedAssemblyId={model.selectedAssemblyId}
+          isLoadingTracks={model.isLoadingTracks}
+        />
 
         {/* Feature Search */}
-        {model.selectedTrackId && (
-          <Box sx={{ mb: 2 }}>
-            <TextField
-              fullWidth
-              label="Search Features"
-              placeholder="Type to search for features (min 3 chars)..."
-              value={searchInputValue}
-              onChange={e => {
-                const newValue = e.target.value
-                //console.log('DEBUG: onChange fired with:', newValue)
-                setSearchInputValue(newValue)
-
-                // Handle debounced search separately
-                if (debounceTimeoutRef.current) {
-                  clearTimeout(debounceTimeoutRef.current)
-                }
-                debounceTimeoutRef.current = setTimeout(() => {
-                  isUpdatingSearchRef.current = true
-                  model.setSearchText(newValue)
-                  if (newValue.trim().length >= 3) {
-                    model.searchFeatures()
-                  } else {
-                    model.clearSearch()
-                  }
-                }, 300)
-              }}
-              onFocus={() => {}}
-              onBlur={() => {}}
-              onKeyDown={() => {}} // Remove unused parameter from onKeyDown
-              InputProps={{
-                endAdornment: (
-                  <>
-                    {model.isSearching && (
-                      <CircularProgress color="inherit" size={20} />
-                    )}
-                  </>
-                ),
-              }}
-            />
-            {/* Show search results in a simple list for now */}
-            {model.features.length > 0 && (
-              <Box sx={{ mt: 1, maxHeight: 200, overflow: 'auto' }}>
-                {model.features.map(feature => (
-                  <Box
-                    key={feature.id}
-                    sx={{
-                      p: 1,
-                      cursor: 'pointer',
-                      '&:hover': { backgroundColor: 'action.hover' },
-                    }}
-                    onClick={() => handleFeatureSelect(feature)}
-                  >
-                    <Typography variant="body2">
-                      <strong>{feature.name ?? feature.id}</strong>
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {feature.type}
-                      {feature.location && ` • ${feature.location}`}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-            )}
-          </Box>
-        )}
+        <FeatureSearchAutocomplete
+          searchInputValue={searchInputValue}
+          onSearchInputChange={value => {
+            setSearchInputValue(value)
+            searchHandler(value)
+          }}
+          features={model.features}
+          onFeatureSelect={handleFeatureSelect}
+          isSearching={model.isSearching}
+          canSearch={model.canSearch}
+          selectedTrackId={model.selectedTrackId}
+          hasSearchTerm={model.hasSearchTerm}
+          contentType="image"
+        />
 
         {/* Error Display */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+        <ErrorDisplay error={error} />
 
         {/* Clear Button */}
-        {(model.selectedTrackId ??
-          model.selectedFeatureId ??
-          model.hasSearchTerm) && (
-          <Box sx={{ mb: 2 }}>
-            <Typography
-              variant="body2"
-              color="primary"
-              sx={{ cursor: 'pointer', textDecoration: 'underline' }}
-              onClick={handleClearSelections}
-            >
-              Clear Selections
-            </Typography>
-          </Box>
-        )}
+        <ClearSelectionsButton
+          hasSelections={hasSelections}
+          onClear={handleClearSelections}
+        />
 
         {/* Content Display */}
         {model.selectedFeatureId && model.isReady && (
@@ -401,45 +254,17 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
         )}
 
         {/* Instructions */}
-        {!model.selectedAssemblyId && (
-          <Box
-            sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}
-          >
-            <Typography variant="body2" color="text.secondary">
-              Select an assembly from the dropdown above to begin browsing
-              tracks and features independently of the main JBrowse selection.
-            </Typography>
-          </Box>
-        )}
-
-        {model.selectedAssemblyId && !model.selectedTrackId && (
-          <Box
-            sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}
-          >
-            <Typography variant="body2" color="text.secondary">
-              Select a track from the &ldquo;
-              {getAssemblyDisplayName(model.selectedAssembly) || 'selected'}
-              &rdquo; assembly to view available features.
-            </Typography>
-          </Box>
-        )}
-
-        {model.selectedTrackId &&
-          !model.selectedFeatureId &&
-          !model.hasSearchTerm &&
-          !model.isSearching && (
-            <Box
-              sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}
-            >
-              <Typography variant="body2" color="text.secondary">
-                Start typing in the search box above to find features from the
-                &ldquo;
-                {model.selectedTrack?.name ?? 'selected'}&rdquo; track and view
-                their image galleries.
-              </Typography>
-            </Box>
-          )}
-      </Paper>
+        <InstructionsPanel
+          selectedAssemblyId={model.selectedAssemblyId}
+          selectedTrackId={model.selectedTrackId}
+          selectedFeatureId={model.selectedFeatureId}
+          hasSearchTerm={model.hasSearchTerm}
+          isSearching={model.isSearching}
+          selectedAssembly={model.selectedAssembly}
+          selectedTrack={model.selectedTrack}
+          contentType="image"
+        />
+      </FlexibleViewContainer>
     )
   })
 

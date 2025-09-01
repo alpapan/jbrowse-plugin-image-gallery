@@ -1,78 +1,23 @@
-import { MenuItem } from '@jbrowse/core/ui'
-import { ElementId } from '@jbrowse/core/util/types/mst'
-import { types, getRoot, Instance, IAnyStateTreeNode } from 'mobx-state-tree'
+import { types, Instance, IAnyStateTreeNode } from 'mobx-state-tree'
 import { getSession } from '@jbrowse/core/util'
-import { readConfObject, getConf } from '@jbrowse/core/configuration'
+import { readConfObject } from '@jbrowse/core/configuration'
+import BaseViewStateModel, {
+  deduplicateContent,
+} from '../shared/BaseViewStateModel'
 
-// Interface for root model with pluginManager
-interface RootModelWithPluginManager {
-  pluginManager: unknown
-}
+// Alias deduplicateContent as deduplicateImages for consistency with original code
+const deduplicateImages = deduplicateContent
 
-// Utility function for deduplicating image arrays
-function deduplicateImages(images: string[]): string[] {
-  const imageMap: Record<string, string> = {}
-
-  // Only deduplicate by URL, not by type
-  for (const image of images) {
-    if (image && !imageMap[image]) {
-      imageMap[image] = image
-    }
-  }
-  return Object.keys(imageMap)
-}
-
-const stateModel: IAnyStateTreeNode = types
-  .model('SelectImageGalleryView', {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    id: ElementId as any,
-    type: types.literal('SelectImageGalleryView'),
-    displayName: types.optional(types.string, 'Image Gallery'),
-    minimized: types.optional(types.boolean, false),
-    width: types.optional(types.number, 400),
-    // Store the selected feature and images for this view
-    selectedFeatureId: types.maybe(types.string),
-    selectedFeatureType: types.optional(
-      types.enumeration('FeatureType', ['GENE', 'NON_GENE']),
-      'GENE',
-    ),
-    featureImages: types.optional(types.string, ''),
-    featureLabels: types.optional(types.string, ''),
-    featureTypes: types.optional(types.string, ''),
-  })
-  .actions(self => ({
-    // Set the width in pixels of the view panel
-    setWidth(newWidth: number) {
-      self.width = newWidth
-    },
-
-    // Set the display name for the view (required for view renaming)
-    setDisplayName(name: string) {
-      self.displayName = name
-    },
-
-    // Set the minimized state for the view
-    setMinimized(flag: boolean) {
-      self.minimized = flag
-    },
-
-    // Close the view by removing it from the session
-    closeView() {
-      try {
-        const session = getSession(self)
-        if (session?.removeView) {
-          // Use TypeScript-suggested unknown conversion for type safety
-          session.removeView(
-            self as unknown as Parameters<typeof session.removeView>[0],
-          )
-        }
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Error closing view:', error)
-      }
-    },
-
-    // Update the feature and images displayed in this view
+const stateModel: IAnyStateTreeNode = BaseViewStateModel.props({
+  type: types.literal('SelectImageGalleryView'),
+  // View-specific properties
+  featureImages: types.optional(types.string, ''),
+  featureLabels: types.optional(types.string, ''),
+  featureTypes: types.optional(types.string, ''),
+})
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  .actions((self: any) => ({
+    // Override updateFeature with image gallery specific logic
     updateFeature(
       featureId: string,
       featureType: 'GENE' | 'NON_GENE',
@@ -89,30 +34,30 @@ const stateModel: IAnyStateTreeNode = types
       const imageList = images
         ? images
             .split(',')
-            .map(url => url.trim())
-            .filter(url => url.length > 0)
+            .map((url: string) => url.trim())
+            .filter((url: string) => url.length > 0)
         : []
       const labelList = labels
         ? labels
             .split(',')
-            .map(label => label.trim())
-            .filter(label => label.length > 0)
+            .map((label: string) => label.trim())
+            .filter((label: string) => label.length > 0)
         : []
       const typeList = types
         ? types
             .split(',')
-            .map(type => type.trim())
-            .filter(type => type.length > 0)
+            .map((type: string) => type.trim())
+            .filter((type: string) => type.length > 0)
         : []
 
       // Use the utility function to deduplicate images
       const uniqueImages = deduplicateImages(imageList)
 
       // Get max items limit from configuration
-      const session = getSession(self)
+      const session = getSession(self as IAnyStateTreeNode)
       const config = session.jbrowse.configuration
       const maxItems = Number(
-        readConfObject(config, ['imageGallery', 'maxItems']) || 0,
+        readConfObject(config, ['selectImageGallery', 'maxItems']) || 0,
       )
       const limitedImages =
         maxItems > 0 ? uniqueImages.slice(0, maxItems) : uniqueImages
@@ -124,7 +69,7 @@ const stateModel: IAnyStateTreeNode = types
       self.featureTypes = typeList.join(',')
     },
 
-    // Clear the current feature
+    // Override clearFeature with specific field clearing
     clearFeature() {
       // Set selectedFeatureId to undefined (types.maybe allows this)
       // Set content fields to empty strings (consistent with types.optional defaults)
@@ -152,132 +97,27 @@ const stateModel: IAnyStateTreeNode = types
       self.featureTypes = ''
     },
   }))
-  .views(self => ({
-    // Plugin manager access following JBrowse 2 best practices
-    get pluginManager() {
-      try {
-        const rootModel = getRoot(self)
-        return rootModel &&
-          typeof rootModel === 'object' &&
-          'pluginManager' in rootModel
-          ? (rootModel as RootModelWithPluginManager).pluginManager
-          : null
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.warn('Failed to access pluginManager:', error)
-        return null
-      }
-    },
-
-    /**
-     * Get the JBrowse 2 session object
-     * @returns The current session
-     */
-    get session() {
-      return getSession(self)
-    },
-
-    /**
-     * Get the assembly manager for accessing assembly data
-     * Following AGENT.md best practices: getSession(self).assemblyManager
-     * @returns The assembly manager instance
-     */
-    get assemblyManager() {
-      return getSession(self).assemblyManager
-    },
-
-    /**
-     * Get list of available assembly names
-     * Following AGENT.md best practices: assemblyManager.assemblyNamesList
-     * @returns Array of assembly names
-     */
-    get availableAssemblies() {
-      try {
-        return this.assemblyManager.assemblyNamesList
-      } catch (error) {
-        console.warn('Failed to get available assemblies:', error)
-        return []
-      }
-    },
-
-    /**
-     * Get track configurations using proven working pattern from AGENT.md
-     * PROVEN WORKING: getConf(jbrowse.configuration, 'tracks')
-     * NOT session.tracks - breaks reactivity and violates JBrowse 2 best practices
-     * @returns Array of track configurations
-     */
-    get trackConfigurations() {
-      try {
-        const { jbrowse } = this.session
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        return getConf(jbrowse.configuration, 'tracks') ?? []
-      } catch (error) {
-        console.warn('Failed to get track configurations:', error)
-        return []
-      }
-    },
-
-    /**
-     * Get track configurations filtered by assembly
-     * Following AGENT.md pattern: filter by assemblyNames using getConf
-     * @param assemblyName - The assembly name to filter by
-     * @returns Array of track configurations for the specified assembly
-     */
-    getTracksForAssembly(assemblyName: string) {
-      if (!assemblyName) {
-        return []
-      }
-
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return this.trackConfigurations.filter((tc: any) =>
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-          (getConf(tc, 'assemblyNames') ?? []).includes(assemblyName),
-        )
-      } catch (error) {
-        console.warn('Failed to filter tracks for assembly:', error)
-        return []
-      }
-    },
-
-    /**
-     * Get assembly object using proper async pattern from AGENT.md
-     * PROVEN WORKING: assemblyManager.waitForAssembly(assemblyId)
-     * @param assemblyId - The assembly ID to fetch
-     * @returns Promise resolving to assembly object
-     */
-    async getAssembly(assemblyId: string) {
-      try {
-        return await this.assemblyManager.waitForAssembly(assemblyId)
-      } catch (error) {
-        console.error('Failed to get assembly:', error)
-        throw error
-      }
-    },
-
-    // Configuration access
-    get config() {
-      const session = getSession(self)
-      return session.jbrowse.configuration
-    },
-
-    // Configuration values with defaults
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  .views((self: any) => ({
+    // Override default display name
     get defaultDisplayName() {
       return (
-        readConfObject(this.config, ['imageGallery', 'defaultDisplayName']) ||
-        'Image Gallery'
+        readConfObject(self.config, [
+          'selectImageGallery',
+          'defaultDisplayName',
+        ]) || 'Image Gallery'
       )
     },
 
     get maxItems(): number {
       return Number(
-        readConfObject(this.config, ['imageGallery', 'maxItems']) || 0,
+        readConfObject(self.config, ['selectImageGallery', 'maxItems']) || 0,
       ) // 0 means unlimited
     },
 
     get imageSize() {
       return (
-        readConfObject(this.config, ['imageGallery', 'imageSize']) || {
+        readConfObject(self.config, ['selectImageGallery', 'imageSize']) || {
           width: 200,
           height: 150,
         }
@@ -286,7 +126,10 @@ const stateModel: IAnyStateTreeNode = types
 
     get gff3AttributeNames() {
       return (
-        readConfObject(this.config, ['imageGallery', 'gff3AttributeNames']) || {
+        readConfObject(self.config, [
+          'selectImageGallery',
+          'gff3AttributeNames',
+        ]) || {
           images: 'images,image_urls,gallery_images',
           labels: 'image_labels,labels,descriptions',
           types: 'image_types,types,categories',
@@ -294,21 +137,9 @@ const stateModel: IAnyStateTreeNode = types
       )
     },
 
-    // unused by this view, but represents of 'view level' menu items
-    menuItems(): MenuItem[] {
-      return []
-    },
-
-    // Computed properties for easy access
+    // Override hasContent for image content
     hasContent() {
       return self.featureImages.trim() !== ''
-    },
-
-    displayTitle() {
-      const displayName = self.displayName || this.defaultDisplayName
-      return self.selectedFeatureId
-        ? `${displayName} for ${String(self.selectedFeatureId)}`
-        : displayName
     },
 
     // Computed view that returns deduplicated images from the stored comma-separated strings
@@ -318,20 +149,15 @@ const stateModel: IAnyStateTreeNode = types
       }
       const imageList = self.featureImages
         .split(',')
-        .map(url => url.trim())
-        .filter(url => url.length > 0)
-      const uniqueImages = deduplicateImages(imageList)
+        .map((url: string) => url.trim())
+        .filter((url: string) => url.length > 0)
+      const uniqueImages = deduplicateImages(imageList as string[])
 
       // Apply max items limit from configuration
-      const maxItems = this.maxItems
+      const maxItems = Number(self.maxItems) || 0
       return maxItems > 0 ? uniqueImages.slice(0, maxItems) : uniqueImages
     },
 
-    // Example usage of pluginManager for potential future enhancements:
-    // - Custom adapters for fetching image data: this.pluginManager?.getAdapterType('CustomImageAdapter')
-    // - Plugin-defined configuration schemas: this.pluginManager?.getConfigurationSchema('imageGallery')
-    // - Integration with other JBrowse 2 plugins: this.pluginManager?.getPlugin('SomeOtherPlugin')
-    // - Custom renderers for image display: this.pluginManager?.getRendererType('CustomImageRenderer')
   }))
 
 export type SelectImageGalleryViewModel = Instance<typeof stateModel>

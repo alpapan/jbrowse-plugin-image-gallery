@@ -2,6 +2,8 @@
 
 This document outlines the correct way to interact with the JBrowse 2 API, intended for an AI agent. It covers core concepts, configuration, and data access patterns.
 
+You can also parse the definition files in @/node_modules/@jbrowse/core/
+
 ## Core Concepts
 
 ### Products and Plugins
@@ -18,14 +20,18 @@ This document outlines the correct way to interact with the JBrowse 2 API, inten
     - `session`: A model representing the dynamic, mutable state of the user's session (open views, tracks, etc.).
 - **Accessing Models:** Use `getSession(anyModelInTree)` to traverse up to the session model. From the session, you can access views, the assemblyManager, etc.
 - **MST Actions:** All state modifications **must** happen within a model's `actions` block. This is fundamental to MST and ensures changes are trackable.
-    ```javascript     const MyModel = types.model({       value: types.string,     }).actions(self => ({       setValue(newValue) {         self.value = newValue; // Correct way to modify state       },     }));     ```
+```javascript     
+const MyModel = types.model({       value: types.string,     }).actions(self => ({       setValue(newValue) {         self.value = newValue; // Correct way to modify state       },     }));     
+```
 - **MST Views:** Use `views` blocks for derived data. These are memoized getters that recompute only when their dependencies change.
-    ```javascript     const MyModel = types.model({       width: types.number,       height: types.number     }).views(self => ({       get area() {         return self.width * self.height; // This is a computed view       },     }));     ```
+```javascript
+     const MyModel = types.model({       width: types.number,       height: types.number     }).views(self => ({       get area() {         return self.width * self.height; // This is a computed view       },     }));     
+ ```
 
 
 ## Configuration (`config.json`)
 
-- **Always use `readConfObject(config, 'slotName')` to access configuration values.** Do not access them directly (e.g., `config.slotName`). This function correctly handles defaults and callbacks.
+- **Always use `readConfObject(config, ['slotName'])` to access configuration values.** Do not access them directly (e.g., `config.slotName`). This function correctly handles defaults and callbacks.
 - **Nested Configuration:** For nested configuration, use an array of keys: `readConfObject(config, ['parentSlot', 'childSlot'])`.
 - **Callback Functions (Jexl):** Configuration values can be Jexl expressions for dynamic values. To evaluate them, pass the required context variables as the third argument: `readConfObject(config, 'color', { feature })`.
 
@@ -44,8 +50,6 @@ const session = getSession(self)
 const pluginManager = session.root.pluginManager
 ```
 
-The JBrowse 2 documentation notes that while they "generally prefer using the session model (via e.g. getSession) over the root model (via e.g. getRoot) in plugin code", the `pluginManager` is one of the properties that remains on the root model and must be accessed through `getRoot()` or via the session's root reference.
-
 
 ```javascript
 import { getSession } from '@jbrowse/core/util'
@@ -55,13 +59,14 @@ import { readConfObject } from '@jbrowse/core/configuration'
 function getTracksForAssembly(self: any) {
   const session = getSession(self)
   const rootModel = getRoot(self)
-  const pluginManager = rootModel.pluginManager
+  const pluginManager = session.root.pluginManager
   
-  const trackConfs = readConfObject(session.jbrowse.configuration, 'tracks') ?? []
-  const trackConf = trackConfs.find(tc => readConfObject(tc, 'trackId') === trackId)
-
+  // only for mobx-state-tree (MST) models that possess a `.configuration` property
+  const trackConfs = (getConf(jbrowse.configuration, 'tracks') ?? [])
+  const trackConf = trackConfs.filter(tc =>(getConf(tc, 'trackId') ?? []).includes(trackId),)
+ 
   // Now use pluginManager to get adapter
-  const adapterConfig = readConfObject(trackConf, 'adapter')
+  const adapterConfig = readConfObject(trackConf, ['adapter'])
   const adapterTypeObj = pluginManager.getAdapterType(adapterConfig.type)
   // ... rest of adapter instantiation
 }
@@ -69,7 +74,41 @@ function getTracksForAssembly(self: any) {
 
 This is the correct way to access the `pluginManager` from within JBrowse 2 plugin code.
 
+and trackConfs = (getConf(jbrowse.configuration, 'tracks') ?? []) is a way to access tracks if you have the mst configuration.
 
+However,  `readConfObject` can be used for reading properties from plain configuration objects, such as TrackConfiguration instances, which do not have a `.configuration` property. For example, to access the assembly names in a track config object, use:
+
+```ts
+assemblyNames = readConfObject(tc, ['assemblyNames'])
+```
+
+This approach is appropriate when working directly with configuration data (e.g., iterating through the static config tree during startup, or when processing config files), because `readConfObject` extracts values directly from config schemas or plain objects.
+
+By contrast, use `getConf` only on mobx-state-tree (MST) models that possess a `.configuration` property, typically in reactive UI or plugin code. Attempting to use `getConf` on a TrackConfiguration object is incorrect and will not work since these objects do not meet the method's requirements.[^1]
+
+[^1]: https://jbrowse.org/jb2/docs/developer_guides/config_model/
+
+## WHEN TO ACCESS PROPERTIES DIRECTLY
+ 
+Important: direct property access (e.g. t.assemblyNames) on track config objects is the correct way in JBrowse 2 when you have plain objects from configuration files or session track lists. The official track configs use an assemblyNames property that is an array of strings specifying which assemblies a track belongs to. You do not need to use readConfObject unless you are working with a config schema/model (which is uncommon for sessionTracks or config.json data). For example:
+```typescript
+export function getAllTracksForAssembly(
+  // ...
+  // Session-added tracks live on session.sessionTracks or session.tracks depending on environment
+  const sessionTracks = (session.sessionTracks ??
+    session.tracks ??
+    []) as TrackConfiguration[]
+
+  const liveTracks = (sessionTracks ?? []).filter((t: TrackConfiguration) => {
+
+const assemblyNames = Array.isArray(t.assemblyNames)
+  ? t.assemblyNames
+  : [t.assemblyNames]
+
+   // ..
+   })
+ )
+```
 
 ## Accessing Data
 
@@ -143,7 +182,7 @@ For getting features using JBrowse's RPC system (recommended approach):
 
 ```javascript
 // Get adapter config from track config using readConfObject
-const adapter = readConfObject(trackConf, 'adapter')
+const adapter = readConfObject(trackConf, ['adapter'])
 
 // Use session's RPC manager to get features
 const rpcManager = session.rpcManager
@@ -164,7 +203,7 @@ const features = Array.isArray(featureResults) ? featureResults : []
 ```
 
 **PROVEN WORKING**: ✅ `rpcManager.call(sessionId, 'CoreGetFeatures', {...})` with sessionId as first parameter  
-**PROVEN WORKING**: ✅ Using `readConfObject(trackConf, 'adapter')` for adapterConfig  
+**PROVEN WORKING**: ✅ Using `readConfObject(trackConf, ['adapter'])` for adapterConfig  
 **PROVEN WORKING**: ✅ `regions: [queryRegion]` (array format) and `adapterConfig: adapter`
 
 
@@ -177,6 +216,26 @@ For a GFF track (using `Gff3TabixAdapter`), the features are standard `SimpleFea
    ```javascript     const featureIds = features.map(feature => feature.get('ID'));     const uniqueIds = [...new Set(featureIds)]; ```
    You can also use `feature.id()` for a unique internal ID for the feature object.
 
+#### Searching
+
+to use the textsearchmanager, make sure you pass an object with an array of assemblynames 
+@see [code definition](https://raw.githubusercontent.com/GMOD/jbrowse-components/refs/heads/main/plugins/text-indexing/src/TextIndexRpcMethod/TextIndexRpcMethod.ts)
+
+```javascript
+      const tsm = session?.textSearchManager
+      let matches: SearchMatch[] = []
+
+      try {
+        matches =
+          (yield tsm.search(searchTerm, {
+            assemblyNames: [self.selectedAssemblyId],
+          })) ?? []
+        console.log('🔍 DEBUG: TextSearch returned:', matches.length, 'matches')
+      } catch (error) {
+        console.log('🔍 DEBUG: TextSearchManager failed:', String(error))
+        matches = []
+      }
+```
 ## Important Best Practices
 
 - **Immutability:** Treat data from `readConfObject` and MST models as immutable. To change state, use actions defined on the MST models.

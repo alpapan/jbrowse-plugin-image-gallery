@@ -29,14 +29,14 @@ The plugin provides two main views for genomic feature visualization:
 ## TextualDescriptionsView Functions
 
 ### `fetchContent()`
-**File**: `src/TextualDescriptionsView/components/Explainers.tsx`
+**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx`
 **Purpose**: Async loading of markdown documents from URLs
 **Parameters**: 
 - `urls` (string[]): Array of markdown document URLs
 **Returns**: Combined markdown content with separators
 
 ### `loadContent()`
-**File**: `src/TextualDescriptionsView/components/Explainers.tsx` (lines 536-572)
+**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 536-572)
 **Purpose**: Effect hook for loading and combining markdown content from multiple URLs
 **Dependencies**: Triggered by changes in `model.featureMarkdownUrls` or `model.selectedFeatureId`
 
@@ -45,7 +45,7 @@ The plugin provides two main views for genomic feature visualization:
 ## Cytoscape Integration Functions
 
 ### `NewickTreeRenderer`
-**File**: `src/TextualDescriptionsView/components/Explainers.tsx` (lines 196-438)
+**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 196-438)
 **Purpose**: Main React component for rendering Newick format phylogenetic trees
 **Features**:
 - Parses square bracket comments for titles and descriptions
@@ -54,7 +54,7 @@ The plugin provides two main views for genomic feature visualization:
 - Supports interactive zooming and panning
 
 ### `convertNode()`
-**File**: `src/TextualDescriptionsView/components/Explainers.tsx` (lines 269-300)
+**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 269-300)
 **Purpose**: Recursively converts phylojs tree nodes to cytoscape elements
 **Parameters**:
 - `node` (phylojs.Node): Source tree node
@@ -62,7 +62,7 @@ The plugin provides two main views for genomic feature visualization:
 **Returns**: Current node ID for edge linking
 
 ### `renderTree()`
-**File**: `src/TextualDescriptionsView/components/Explainers.tsx` (lines 204-391)
+**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 204-391)
 **Purpose**: Main async function for tree rendering workflow
 **Steps**:
 1. Parse title/description from square bracket comments
@@ -76,7 +76,7 @@ The plugin provides two main views for genomic feature visualization:
 ## Cytoscape Visualization Components
 
 ### `CytoscapeDirectRender`
-**File**: `src/TextualDescriptionsView/components/Explainers.tsx` (lines 51-150)
+**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 51-150)
 **Purpose**: Interactive cytoscape diagram renderer for JSON format
 **Features**:
 - Direct JSON format processing
@@ -85,7 +85,7 @@ The plugin provides two main views for genomic feature visualization:
 - Container management and error handling
 
 ### `CytoscapeDiagram`
-**File**: `src/TextualDescriptionsView/components/Explainers.tsx` (lines 152-193)
+**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 152-193)
 **Purpose**: Simple test/debug component for flowchart content
 **Usage**: Development and debugging of container references
 
@@ -94,7 +94,7 @@ The plugin provides two main views for genomic feature visualization:
 ## Markdown Processing
 
 ### `MarkdownComponents.code`
-**File**: `src/TextualDescriptionsView/components/Explainers.tsx` (lines 441-500)
+**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 441-500)
 **Purpose**: Custom code block renderer that handles special visualization formats
 **Supported Languages**:
 - `cytoscape`: JSON format diagrams
@@ -106,7 +106,7 @@ The plugin provides two main views for genomic feature visualization:
 ## Main Plugin Functions
 
 ### `TextualDescriptionsViewF`
-**File**: `src/TextualDescriptionsView/components/Explainers.tsx` (lines 533-603)
+**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 533-603)
 **Purpose**: Main observer component for textual descriptions view
 **Features**:
 - MobX state observation
@@ -119,7 +119,7 @@ The plugin provides two main views for genomic feature visualization:
 ## Styling and Layout
 
 ### Phylogenetic Tree Styling
-**File**: `src/TextualDescriptionsView/components/Explainers.tsx` (lines 318-354)
+**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 318-354)
 **Purpose**: Defines visual styling for phylogenetic trees
 **Features**:
 - Pastel color scheme for nodes
@@ -127,7 +127,7 @@ The plugin provides two main views for genomic feature visualization:
 - Text wrapping and label management
 
 ### Cytoscape Layout Configuration
-**File**: `src/TextualDescriptionsView/components/Explainers.tsx` (lines 362-373)
+**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 362-373)
 **Purpose**: Klay layout settings for phylogenetic trees
 **Settings**:
 - Right-directed tree flow

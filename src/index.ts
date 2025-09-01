@@ -122,7 +122,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       return new ViewType({
         name: 'FlexibleImageGalleryView',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        stateModel: flexibleImageGalleryViewStateModel as any,
+        stateModel: flexibleImageGalleryViewStateModel,
         ReactComponent: FlexibleImageGalleryViewReactComponent,
       })
     })
@@ -131,36 +131,42 @@ export default class RichAnnotationsPlugin extends Plugin {
   configure(pluginManager: PluginManager) {
     if (isAbstractMenuManager(pluginManager.rootModel)) {
       pluginManager.rootModel.appendToMenu('Add', {
-        label: 'Select Image Gallery View',
+        label: 'Image gallery: select a feature',
         onClick: (session: AbstractSessionModel) => {
           session.addView('SelectImageGalleryView', {
-            id: 'imageGalleryView',
-            displayName: 'Select Image Gallery',
+            id: 'selectImageGalleryView',
+            displayName: 'Image gallery: select a feature',
           })
         },
       })
 
       pluginManager.rootModel.appendToMenu('Add', {
-        label: 'Select Textual Descriptions View',
+        label: 'Image gallery: search for a feature',
+        onClick: (session: AbstractSessionModel) => {
+          session.addView('FlexibleImageGalleryView', {
+            id: 'flexibleImageGalleryView',
+            displayName: 'Image gallery: select a feature',
+          })
+        },
+      })
+
+      pluginManager.rootModel.appendToMenu('Add', {
+        label: 'Text info: select a feature',
         onClick: (session: AbstractSessionModel) => {
           session.addView('SelectTextualDescriptionsView', {
-            id: 'textualDescriptionsView',
-            displayName: 'Select Textual Descriptions',
+            id: 'selectTextualDescriptionsView',
+            displayName: 'Text info: select a feature',
           })
         },
       })
 
       pluginManager.rootModel.appendToMenu('Add', {
-        label: 'Flexible Textual Descriptions View',
+        label: 'Text info: search for a feature',
         onClick: (session: AbstractSessionModel) => {
-          session.addView('FlexibleTextualDescriptionsView', {})
-        },
-      })
-
-      pluginManager.rootModel.appendToMenu('Add', {
-        label: 'Flexible Image Gallery View',
-        onClick: (session: AbstractSessionModel) => {
-          session.addView('FlexibleImageGalleryView', {})
+          session.addView('FlexibleTextualDescriptionsView', {
+            id: 'flexibleTextualDescriptionsView',
+            displayName: 'Text info: search for a feature',
+          })
         },
       })
     }
@@ -271,7 +277,7 @@ export default class RichAnnotationsPlugin extends Plugin {
     featureSummary: FeatureSummary,
   ) {
     try {
-      const viewId = 'imageGalleryView'
+      const viewId = 'selectImageGalleryView'
       const featureKey = `${viewId}-${featureSummary.id}`
 
       // Clear manually closed flag when selection changes to different feature
@@ -340,7 +346,7 @@ export default class RichAnnotationsPlugin extends Plugin {
     featureSummary: FeatureSummary,
   ) {
     try {
-      const viewId = 'imageGalleryView'
+      const viewId = 'selectImageGalleryView'
 
       // Check if SelectImageGalleryView already exists - do NOT create new ones automatically
       const selectImageGalleryView = session?.views
@@ -379,7 +385,7 @@ export default class RichAnnotationsPlugin extends Plugin {
     featureSummary: FeatureSummary,
   ) {
     try {
-      const viewId = 'textualDescriptionsView'
+      const viewId = 'selectTextualDescriptionsView'
       const featureKey = `${viewId}-${featureSummary.id}`
 
       // Don't recreate view if user manually closed it for this feature
@@ -441,7 +447,7 @@ export default class RichAnnotationsPlugin extends Plugin {
   // Method to clear SelectImageGalleryView
   private clearSelectImageGalleryView(session: AbstractSessionModel) {
     try {
-      const viewId = 'imageGalleryView'
+      const viewId = 'selectImageGalleryView'
       if (session?.views) {
         const selectImageGalleryView = session.views.find(
           view => view.type === 'SelectImageGalleryView' && view.id === viewId,
@@ -464,7 +470,7 @@ export default class RichAnnotationsPlugin extends Plugin {
   // Method to clear SelectTextualDescriptionsView
   private clearSelectTextualDescriptionsView(session: AbstractSessionModel) {
     try {
-      const viewId = 'textualDescriptionsView'
+      const viewId = 'selectTextualDescriptionsView'
       if (session?.views) {
         const selectTextualDescriptionsView = session.views.find(
           view =>

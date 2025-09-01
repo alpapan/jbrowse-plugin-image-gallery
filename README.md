@@ -430,7 +430,7 @@ This tree demonstrates:
 
 #### SelectTextualDescriptionsView
 - **State Model** (`SelectTextualDescriptionsView/stateModel.ts`): MobX state tree with feature and content management
-- **React Component** (`SelectTextualDescriptionsView/components/Explainers.tsx`): Markdown rendering with cytoscape integration
+- **React Component** (`SelectTextualDescriptionsView/components/TextualDescriptionsView.tsx`): Markdown rendering with cytoscape integration
 - **Plugin Registration** (`index.ts`: ViewType registration and automatic view management
 
 ### Data Flow
