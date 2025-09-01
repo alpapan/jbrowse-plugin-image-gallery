@@ -207,6 +207,7 @@ function getBaseTrackConfigs(session: AbstractSessionModel): BaseTrackConfig[] {
       // )
     }
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.warn(
       '[FlexibleViewUtils] Could not access track configurations:',
       error,

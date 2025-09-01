@@ -712,11 +712,9 @@ export default class RichAnnotationsPlugin extends Plugin {
 
         const children = feature.children?.()
         if (Array.isArray(children)) {
-          if (Array.isArray(children)) {
-            children.forEach((child: Feature) => {
-              extractImageData(child)
-            })
-          }
+          children.forEach((child: Feature) => {
+            extractImageData(child)
+          })
         }
       }
     } catch (e) {

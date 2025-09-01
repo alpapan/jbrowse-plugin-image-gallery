@@ -22,46 +22,37 @@ export const SearchableViewMixinProperties = {
 export const SearchableViewMixin = (self: any) => ({
   views: {
     get availableAssemblies() {
-      // console.log('DEBUG: availableAssemblies getter called')
+      // Debug statements removed - were used for development logging
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const session = getSession(self)
         const assemblyManager = session.assemblyManager
-        // console.log('DEBUG: assemblyManager:', assemblyManager)
         const assemblyNames = assemblyManager?.assemblyNamesList || []
-        // console.log('DEBUG: assemblyNames:', assemblyNames)
 
         const assemblies = assemblyNames.map((name: string) => ({
           name,
           displayName: getAssemblyDisplayName({ name }),
         }))
-        // console.log('DEBUG: formatted assemblies:', assemblies)
         return assemblies
       } catch (error) {
-        // console.error('DEBUG: Error in availableAssemblies getter:', error)
+        // eslint-disable-next-line no-console
+        console.error('Error in availableAssemblies getter:', error)
         return []
       }
     },
 
     get availableTracks() {
-      // console.log(
-      //   'DEBUG: availableTracks getter called, selectedAssemblyId:',
-      //   self.selectedAssemblyId,
-      // )
+      // Debug statements removed - were used for development logging
       if (!self.selectedAssemblyId) {
         return []
       }
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const tracks = getAllTracksForAssembly(self, self.selectedAssemblyId)
-        // console.log(
-        //   'DEBUG: availableTracks result:',
-        //   tracks?.length || 0,
-        //   'tracks',
-        // )
         return tracks.map(extractTrackInfo)
       } catch (error) {
-        console.error('DEBUG: Error in availableTracks getter:', error)
+        // eslint-disable-next-line no-console
+        console.error('Error in availableTracks getter:', error)
         return []
       }
     },
@@ -71,6 +62,7 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     get selectedAssembly() {
+      // Debug statements removed - were used for development logging
       if (!self.selectedAssemblyId) {
         return undefined
       }
@@ -86,7 +78,8 @@ export const SearchableViewMixin = (self: any) => ({
             }
           : undefined
       } catch (error) {
-        console.error('DEBUG: Error in selectedAssembly getter:', error)
+        // eslint-disable-next-line no-console
+        console.error('Error in selectedAssembly getter:', error)
         return undefined
       }
     },
@@ -154,7 +147,7 @@ export const SearchableViewMixin = (self: any) => ({
   actions: {
     // Method names that components expect
     setSelectedAssembly(assemblyId: string) {
-      // console.log('DEBUG: setSelectedAssembly called with:', assemblyId)
+      // Debug statements removed - were used for development logging
       self.selectedAssemblyId = assemblyId
       self.selectedTrackId = undefined
       self.searchResults.clear()
@@ -163,7 +156,7 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     setSelectedTrack(trackId: string) {
-      // console.log('DEBUG: setSelectedTrack called with:', trackId)
+      // Debug statements removed - were used for development logging
       self.selectedTrackId = trackId
       self.searchResults.clear()
       self.selectedFeatureId = undefined
@@ -171,16 +164,15 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     setSearchTerm(searchTerm: string) {
-      // console.log('DEBUG: setSearchTerm called with:', searchTerm)
+      // Debug statements removed - were used for development logging
       self.searchTerm = searchTerm
     },
 
     // Base method for common clearSearch logic
     clearSearchBase() {
-      // console.log('DEBUG: clearSearchBase called')
+      // Debug statements removed - were used for development logging
       // Check if the MST node is still alive before modifying state
       if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) {
-        // console.log('DEBUG: clearSearchBase called on dead MST node, skipping')
         return
       }
       self.searchTerm = ''
@@ -190,10 +182,9 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     clearSearch() {
-      // console.log('DEBUG: clearSearch called')
+      // Debug statements removed - were used for development logging
       // Check if the MST node is still alive before calling base method
       if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) {
-        // console.log('DEBUG: clearSearch called on dead MST node, skipping')
         return
       }
       // Delegate to base implementation
@@ -201,23 +192,22 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     selectFeature(featureId: string, featureType: string) {
-      // console.log('DEBUG: selectFeature called with:', featureId, featureType)
+      // Debug statements removed - were used for development logging
       self.selectedFeatureId = featureId
       self.selectedFeatureType = featureType
     },
 
     clearFeatureSelection() {
-      // console.log('DEBUG: clearFeatureSelection called')
+      // Debug statements removed - were used for development logging
       self.selectedFeatureId = undefined
       self.selectedFeatureType = 'GENE'
     },
 
     // Base method for common clearSelections logic
     clearSelectionsBase() {
-      // console.log('DEBUG: clearSelectionsBase called')
+      // Debug statements removed - were used for development logging
       // Check if the MST node is still alive before modifying state
       if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) {
-        // console.log('DEBUG: clearSelectionsBase called on dead MST node, skipping')
         return
       }
       self.selectedAssemblyId = undefined
@@ -229,10 +219,9 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     clearSelections() {
-      // console.log('DEBUG: clearSelections called')
+      // Debug statements removed - were used for development logging
       // Check if the MST node is still alive before calling base method
       if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) {
-        // console.log('DEBUG: clearSelections called on dead MST node, skipping')
         return
       }
       // Delegate to base implementation
@@ -240,7 +229,7 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     searchFeatures: flow(function* searchFeatures() {
-      // console.log('DEBUG: searchFeatures called')
+      // Debug statements removed - were used for development logging
       self.isSearching = true
       self.searchResults.clear()
       self.selectedFeatureId = undefined
@@ -250,13 +239,10 @@ export const SearchableViewMixin = (self: any) => ({
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const results = yield searchFeatureTextIndex()(self)
 
-        // if (results?.length > 0) {
-        //   console.log('DEBUG: searchFeatures results:', results?.length || 0)
-        // }
-
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         self.searchResults.replace(results as SearchResult[])
       } catch (e) {
+        // eslint-disable-next-line no-console
         console.error('Error searching features:', e)
       } finally {
         self.isSearching = false

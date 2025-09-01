@@ -1,195 +1,328 @@
-// JBrowse2 Plugin Function Documentation
+# JBrowse2 Plugin Function Documentation
 
 ## Description
 
-This document provides comprehensive documentation for all functions in the JBrowse2 Rich Annotations Plugin, organized by view type and functionality.
+This document provides comprehensive documentation for all functions in the JBrowse2 Rich Annotations Plugin, organized by module and functionality.
 
 ## Plugin Overview
 
-The plugin provides two main views for genomic feature visualization:
-- **ImageGalleryView**: Image display and organization
-- **TextualDescriptionsView**: Markdown document rendering with interactive diagrams
+The plugin provides four main views for genomic feature visualization:
+- **SelectImageGalleryView**: Image display for selected features
+- **SelectTextualDescriptionsView**: Markdown document rendering for selected features
+- **FlexibleImageGalleryView**: Searchable image gallery with assembly/track selection
+- **FlexibleTextualDescriptionsView**: Searchable textual descriptions with assembly/track selection
 
 ---
 
-## ImageGalleryView Functions
+## Main Plugin Class
 
-### `updateFeature()`
-**File**: `src/ImageGalleryView/stateModel.ts`
-**Purpose**: Updates the selected feature and associated images
-**Parameters**: 
-- `featureId` (string): Unique identifier for the feature
-- `featureType` (FeatureType): Gene or non-gene classification
-- `images` (string): Comma-separated list of image URLs
-- `labels` (string): Comma-separated list of image labels
-- `types` (string): Comma-separated list of image types
+### `RichAnnotationsPlugin` (src/index.ts)
 
----
+Main plugin class that manages view registration and feature selection monitoring.
 
-## TextualDescriptionsView Functions
+#### Methods
 
-### `fetchContent()`
-**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx`
-**Purpose**: Async loading of markdown documents from URLs
-**Parameters**: 
-- `urls` (string[]): Array of markdown document URLs
-**Returns**: Combined markdown content with separators
-
-### `loadContent()`
-**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 536-572)
-**Purpose**: Effect hook for loading and combining markdown content from multiple URLs
-**Dependencies**: Triggered by changes in `model.featureMarkdownUrls` or `model.selectedFeatureId`
+- **`install(pluginManager: PluginManager)`**: Registers four view types with the plugin manager
+- **`configure(pluginManager: PluginManager)`**: Adds menu items for manual view creation and sets up autorun for feature selection monitoring
+- **`manageSelectImageGalleryView(session, featureSummary)`**: Updates SelectImageGalleryView based on current feature selection
+- **`manageSelectImageGalleryViewWithoutImages(session, featureSummary)`**: Updates SelectImageGalleryView for features without images
+- **`manageSelectTextualDescriptionsView(session, featureSummary)`**: Updates SelectTextualDescriptionsView based on current feature selection
+- **`clearSelectImageGalleryView(session)`**: Clears the SelectImageGalleryView
+- **`clearSelectTextualDescriptionsView(session)`**: Clears the SelectTextualDescriptionsView
+- **`collectImagesFromFeatureAndSubfeatures(feature)`**: Extracts image data from a feature and all its subfeatures
+- **`collectTextualContentFromFeatureAndSubfeatures(feature)`**: Extracts textual content from a feature and all its subfeatures
 
 ---
 
-## Cytoscape Integration Functions
+## View State Models
 
-### `NewickTreeRenderer`
-**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 196-438)
-**Purpose**: Main React component for rendering Newick format phylogenetic trees
-**Features**:
-- Parses square bracket comments for titles and descriptions
-- Converts phylojs tree structures to cytoscape elements
-- Uses Klay layout algorithm for optimal tree positioning
-- Supports interactive zooming and panning
+### SelectImageGalleryView (src/SelectImageGalleryView/stateModel.ts)
 
-### `convertNode()`
-**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 269-300)
-**Purpose**: Recursively converts phylojs tree nodes to cytoscape elements
-**Parameters**:
-- `node` (phylojs.Node): Source tree node
-- `parentId` (string | null): Parent node identifier for edge creation
-**Returns**: Current node ID for edge linking
+State model for the select image gallery view.
 
-### `renderTree()`
-**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 204-391)
-**Purpose**: Main async function for tree rendering workflow
-**Steps**:
-1. Parse title/description from square bracket comments
-2. Clean newick data for phylojs parsing
-3. Convert tree structure to cytoscape format
-4. Initialize cytoscape with Klay layout
-5. Apply styling and enable interactions
+#### Actions
+
+- **`updateFeature(featureId, featureType, images, labels?, types?)`**: Updates the view with feature image data
+- **`clearFeature()`**: Clears the current feature data
+- **`updateFeatureWithoutImages(featureId, featureType)`**: Updates the view for a feature without images
+
+#### Views
+
+- **`defaultDisplayName`**: Returns the default display name for the view
+- **`maxItems`**: Returns the maximum number of items to display
+- **`imageSize`**: Returns the image size configuration
+- **`gff3AttributeNames`**: Returns the GFF3 attribute names configuration
+- **`hasContent()`**: Returns whether the view has content to display
+- **`deduplicatedImages()`**: Returns deduplicated list of images
 
 ---
 
-## Cytoscape Visualization Components
+### SelectTextualDescriptionsView (src/SelectTextualDescriptionsView/stateModel.ts)
 
-### `CytoscapeDirectRender`
-**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 51-150)
-**Purpose**: Interactive cytoscape diagram renderer for JSON format
-**Features**:
-- Direct JSON format processing
-- Breadthfirst layout algorithm
-- Custom node and edge styling
-- Container management and error handling
+State model for the select textual descriptions view.
 
-### `CytoscapeDiagram`
-**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 152-193)
-**Purpose**: Simple test/debug component for flowchart content
-**Usage**: Development and debugging of container references
+#### Actions
 
----
+- **`updateFeature(featureId, featureType, markdownUrls, descriptions?, contentTypes?)`**: Updates the view with feature textual data
+- **`clearFeature()`**: Clears the current feature data
 
-## Markdown Processing
+#### Views
 
-### `MarkdownComponents.code`
-**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 441-500)
-**Purpose**: Custom code block renderer that handles special visualization formats
-**Supported Languages**:
-- `cytoscape`: JSON format diagrams
-- `newick`: Phylogenetic tree format
-- Standard syntax highlighting for other languages
+- **`defaultDisplayName`**: Returns the default display name for the view
+- **`maxItems`**: Returns the maximum number of items to display
+- **`gff3AttributeNames`**: Returns the GFF3 attribute names configuration
+- **`hasContent()`**: Returns whether the view has content to display
+- **`deduplicatedMarkdownUrls()`**: Returns deduplicated list of markdown URLs
 
 ---
 
-## Main Plugin Functions
+### FlexibleImageGalleryView (src/FlexibleImageGalleryView/stateModel.ts)
 
-### `TextualDescriptionsViewF`
-**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 533-603)
-**Purpose**: Main observer component for textual descriptions view
-**Features**:
-- MobX state observation
-- Async content loading
-- Error handling and loading states
-- Conditional rendering based on content availability
+State model for the flexible image gallery view with search capabilities.
 
----
+#### Actions
 
-## Styling and Layout
+- **`updateFeature(featureId, featureType, images?, labels?, types?)`**: Updates the view with feature image data
+- **`clearFeature()`**: Clears the current feature data
+- **`setSelectedAssembly(assemblyId)`**: Sets the selected assembly
+- **`setSelectedTrack(trackId)`**: Sets the selected track
+- **`setSearchTerm(searchTerm)`**: Sets the search term
+- **`clearSearch()`**: Clears the search
+- **`selectFeature(featureId, featureType)`**: Selects a feature
+- **`setSelectedFeature(featureId?, featureType?, images?, labels?, types?)`**: Sets the selected feature with data
+- **`selectFeatureWithImageData(featureId?)`**: Selects a feature and fetches its image data
+- **`clearFeatureSelection()`**: Clears the feature selection
+- **`clearSelections()`**: Clears all selections
+- **`setLoadingFeatures(loading)`**: Sets the loading state for features
+- **`searchFeatures()`**: Searches for features
 
-### Phylogenetic Tree Styling
-**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 318-354)
-**Purpose**: Defines visual styling for phylogenetic trees
-**Features**:
-- Pastel color scheme for nodes
-- Differentiated styling for leaf vs internal nodes
-- Text wrapping and label management
+#### Views
 
-### Cytoscape Layout Configuration
-**File**: `src/TextualDescriptionsView/components/TextualDescriptionsView.tsx` (lines 362-373)
-**Purpose**: Klay layout settings for phylogenetic trees
-**Settings**:
-- Right-directed tree flow
-- Orthogonal edge routing
-- Optimized spacing and padding
+- **`defaultDisplayName`**: Returns the default display name for the view
+- **`hasContent()`**: Returns whether the view has content to display
+- **`displayTitle`**: Returns the display title for the view
+- **`canSelectFeature`**: Returns whether a feature can be selected
 
 ---
 
-## Plugin Registration and Management
+### FlexibleTextualDescriptionsView (src/FlexibleTextualDescriptionsView/stateModel.ts)
 
-### Plugin Class (`RichAnnotationsPlugin`)
-**File**: `src/index.ts`
-**Purpose**: Main plugin class with view registration and management
-**Key Methods**:
-- `install()`: Registers both view types with plugin manager
-- `configure()`: Adds menu items for manual view creation
+State model for the flexible textual descriptions view with search capabilities.
 
-### View Type Registration
-**File**: `src/index.ts`
-**Registration**:
-- `ImageGalleryViewType` - Registers ImageGalleryView
-- `TextualDescriptionsViewType` - Registers TextualDescriptionsView
-**Auto-activation**: Uses autorun to monitor feature selection and automatically open appropriate views
+#### Actions
 
-### State Models
-**Files**: 
-- `src/ImageGalleryView/stateModel.ts`
-- `src/TextualDescriptionsView/stateModel.ts`
-**Purpose**: MobX state tree models for view state management
-**Features**: Feature tracking, content management, view lifecycle methods
+- **`updateFeature(featureId, featureType, content, descriptions?, contentTypes?)`**: Updates the view with feature textual data
+- **`clearFeature()`**: Clears the current feature data
+- **`setSelectedAssembly(assemblyId)`**: Sets the selected assembly
+- **`setSelectedTrack(trackId)`**: Sets the selected track
+- **`setSearchTerm(searchTerm)`**: Sets the search term
+- **`clearSearch()`**: Clears the search
+- **`selectFeature(featureId, featureType)`**: Selects a feature
+- **`setSelectedFeature(featureId?, featureType?, markdownUrls?, descriptions?, contentTypes?)`**: Sets the selected feature with data
+- **`clearFeatureSelection()`**: Clears the feature selection
+- **`clearSelections()`**: Clears all selections
+- **`setLoadingFeatures(loading)`**: Sets the loading state for features
+- **`searchFeatures()`**: Searches for features
+
+#### Views
+
+- **`defaultDisplayName`**: Returns the default display name for the view
+- **`hasContent()`**: Returns whether the view has content to display
+
+---
+
+## Shared Base Models
+
+### BaseViewStateModel (src/shared/BaseViewStateModel.ts)
+
+Base state model providing common functionality for all views.
+
+#### Actions
+
+- **`setWidth(newWidth)`**: Sets the width of the view panel
+- **`setDisplayName(name)`**: Sets the display name for the view
+- **`setMinimized(flag)`**: Sets the minimized state for the view
+- **`closeView()`**: Closes the view by removing it from the session
+- **`updateFeature(featureId, featureType, content, descriptions?, contentTypes?)`**: Updates the feature and content displayed in this view
+- **`clearFeature()`**: Clears the current feature
+
+#### Views
+
+- **`pluginManager`**: Access to the JBrowse plugin manager
+- **`session`**: Access to the current JBrowse session
+- **`assemblyManager`**: Access to the assembly manager
+- **`availableAssemblies`**: List of available assembly names
+- **`trackConfigurations`**: Track configurations using proper JBrowse patterns
+- **`getTracksForAssembly(assemblyName)`**: Gets track configurations filtered by assembly
+- **`getAssembly(assemblyId)`**: Gets assembly object using proper async pattern
+- **`config`**: Access to JBrowse configuration
+- **`defaultDisplayName`**: Default display name for the view
+- **`menuItems()`**: Menu items for the view
+- **`hasContent()`**: Whether the view has content to display
+- **`displayTitle`**: Display title for the view
+
+---
+
+### SearchableViewMixin (src/shared/SearchableViewMixin.ts)
+
+Mixin providing search functionality for flexible views.
+
+#### Views
+
+- **`availableAssemblies`**: Available assemblies in the session
+- **`availableTracks`**: Available tracks for the selected assembly
+- **`assemblyName`**: Name of the selected assembly
+- **`selectedAssembly`**: Selected assembly object
+- **`selectedTrack`**: Selected track object
+- **`hasSelectedAssembly`**: Whether an assembly is selected
+- **`hasSelectedTrack`**: Whether a track is selected
+- **`hasSearchResults`**: Whether there are search results
+- **`hasSearchTerm`**: Whether there is a search term
+- **`features`**: List of features from search results
+- **`canSearch`**: Whether search is available
+- **`isReady`**: Whether the view is ready for interaction
+- **`isTrackReady`**: Whether the track is ready
+- **`viewDisplayName`**: Display name including selected feature
+- **`selectedFeature`**: Currently selected feature from search results
+
+#### Actions
+
+- **`setSelectedAssembly(assemblyId)`**: Sets the selected assembly
+- **`setSelectedTrack(trackId)`**: Sets the selected track
+- **`setSearchTerm(searchTerm)`**: Sets the search term
+- **`clearSearchBase()`**: Base implementation for clearing search
+- **`clearSearch()`**: Clears the search
+- **`selectFeature(featureId, featureType)`**: Selects a feature
+- **`clearFeatureSelection()`**: Clears the feature selection
+- **`clearSelectionsBase()`**: Base implementation for clearing all selections
+- **`clearSelections()`**: Clears all selections
+- **`searchFeatures()`**: Searches for features
+
+---
+
+## Utility Functions
+
+### FlexibleViewUtils (src/shared/flexibleViewUtils.ts)
+
+Utility functions for flexible views and feature searching.
+
+#### Functions
+
+- **`searchTrackFeatures(session, trackConf, searchTerm, maxResults?)`**: Searches track features using text search adapter
+- **`getBaseTrackConfigs(session)`**: Gets all track configurations from session
+- **`findTrackById(trackConfs, trackId)`**: Finds a track configuration by ID
+- **`safeGetAdapter(trackConf)`**: Safely gets adapter configuration from track
+- **`getAssemblyDisplayName(assembly)`**: Gets display name for assembly
+- **`getAllTracksForAssembly(self, requestedAssemblyName)`**: Gets all tracks for a specific assembly
+- **`extractTrackInfo(trackConf)`**: Extracts track information for UI display
+- **`searchFeatureRangeQueries(contentExtractor)`**: Creates a search flow for feature range queries
+- **`searchFeatureTextIndex(contentExtractor)`**: Creates a search flow using text index
+- **`getFeatureId(feature)`**: Gets feature ID from various possible attributes
+- **`getFeatureName(feature)`**: Gets feature name from various possible attributes
+
+---
+
+## React Components
+
+### SelectImageGalleryView Components
+
+#### ImageGalleryView (src/SelectImageGalleryView/components/ImageGalleryView.tsx)
+Main wrapper component for the select image gallery view.
+
+#### SelectImageGalleryViewF (src/SelectImageGalleryView/components/Explainers.tsx)
+Main observer component that renders the image gallery content.
+
+#### ImageGalleryContent
+Component that handles image grouping, lazy loading, and display.
+
+#### LazyImage
+Component for lazy loading images with error handling.
+
+### SelectTextualDescriptionsView Components
+
+#### TextualDescriptionsView (src/SelectTextualDescriptionsView/components/TextualDescriptionsView.tsx)
+Main wrapper component for the select textual descriptions view.
+
+#### SelectTextualDescriptionsViewF (src/SelectTextualDescriptionsView/components/Explainers.tsx)
+Main observer component that renders markdown content with custom components.
+
+#### CytoscapeDirectRender
+Component for rendering Cytoscape diagrams from JSON format.
+
+#### CytoscapeDiagram
+Test component for flowchart content.
+
+#### NewickTreeRenderer
+Component for rendering phylogenetic trees from Newick format.
+
+#### MarkdownComponents
+Custom markdown components including code block handlers for visualizations.
+
+### Flexible View Components
+
+#### FlexibleImageGalleryViewComponent (src/FlexibleImageGalleryView/components/FlexibleImageGalleryView.tsx)
+Main component for the flexible image gallery view with search interface.
+
+#### FlexibleTextualDescriptionsViewComponent (src/FlexibleTextualDescriptionsView/components/FlexibleTextualDescriptionsView.tsx)
+Main component for the flexible textual descriptions view with search interface.
+
+### Shared Components (src/shared/components/FlexibleViewSelectors.tsx)
+
+#### AssemblySelector
+Component for selecting assemblies from available options.
+
+#### TrackSelector
+Component for selecting tracks from the selected assembly.
+
+#### FeatureSearchAutocomplete
+Component for searching and selecting features with autocomplete.
+
+#### FlexibleViewContainer
+Container component for flexible views.
+
+#### InstructionsPanel
+Component displaying contextual instructions for users.
+
+#### ErrorDisplay
+Component for displaying error messages.
+
+#### ClearSelectionsButton
+Component for clearing all current selections.
+
+---
+
+## Type Declarations
+
+### declare.d.ts (src/declare.d.ts)
+
+Type declarations for external libraries:
+
+- **`phylojs`**: Types for phylogenetic tree parsing and manipulation
+- **`cytoscape-dagre`**: Types for DAG layout extension
+- **`cytoscape-cola`**: Types for force-directed layout extension
+- **`cytoscape-klay`**: Types for hierarchical layout extension
+
+---
 
 ## Dependencies Integration
 
 ### phylojs Integration
-**Purpose**: Parses Newick format phylogenetic trees
-**Usage**: `phylojs.readNewick(cleanedData)` returns parsed tree structure
-**Features**: Supports standard Newick format with branch lengths and node labels
+Used for parsing Newick format phylogenetic trees in textual descriptions.
 
-### cytoscape-klay Integration  
-**Purpose**: Advanced graph layout for phylogenetic trees
-**Usage**: Professional left-to-right tree layout with orthogonal edge routing
-**Benefits**: Clean, publication-ready tree visualizations
+### cytoscape Integration
+Used for rendering interactive diagrams and phylogenetic trees.
 
 ### react-markdown Integration
-**Purpose**: Renders markdown with custom components
-**Extensions**: GitHub Flavored Markdown (remark-gfm)
-**Custom Components**: Tables, code blocks, phylogenetic trees, cytoscape diagrams
+Used for rendering markdown content with custom components for visualizations.
+
+---
 
 ## Development Guidelines
 
-1. **Function Documentation**: All functions include TypeScript types and JSDoc comments
-2. **Error Handling**: Comprehensive error handling with user-friendly messages  
+1. **State Management**: All state modifications happen within MobX actions
+2. **Error Handling**: Comprehensive error handling with user-friendly messages
 3. **Performance**: Lazy loading, intersection observers, and dynamic imports
-4. **Accessibility**: Proper ARIA labels and semantic HTML structure
-5. **Testing**: All functions designed to be testable with clear inputs/outputs
-
-## Adding New Visualization Types
-
-To add a new visualization type (e.g., `protein-structure`):
-
-1. Create renderer component following `NewickTreeRenderer` pattern
-2. Add language detection in `MarkdownComponents.code`
-3. Route to new renderer in the language switch statement
-4. Update README.md with usage documentation
-5. Add tests in `/tests/` directory
+4. **TypeScript**: Full TypeScript support with proper type definitions
+5. **JBrowse Best Practices**: Follows AGENT.md guidelines for configuration access and state management
+6. **Modularity**: Clean separation between view types and shared functionality
+7. **Testing**: Functions designed to be testable with clear inputs/outputs
