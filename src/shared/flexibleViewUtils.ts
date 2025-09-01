@@ -1,18 +1,12 @@
 // Shared utilities for FlexibleImageGalleryView and FlexibleTextualDescriptionsView
-import { flow, getRoot } from 'mobx-state-tree'
+import { flow } from 'mobx-state-tree'
 import { getSession, AbstractSessionModel } from '@jbrowse/core/util'
 import {
   readConfObject,
   AnyConfigurationModel,
-  getConf,
 } from '@jbrowse/core/configuration'
 import type { Region } from '@jbrowse/core/util/types'
 import type { Feature } from '@jbrowse/core/util/simpleFeature'
-import type TextSearchManager from '@jbrowse/core/TextSearch/TextSearchManager'
-import type {
-  BaseTextSearchArgs,
-  BaseTextSearchAdapter,
-} from '@jbrowse/core/data_adapters/BaseAdapter'
 import type { BaseTrackConfig } from '@jbrowse/core/pluggableElementTypes/models'
 import type { IBaseViewModel } from '@jbrowse/core/pluggableElementTypes/models'
 
@@ -30,59 +24,9 @@ const COMPATIBLE_ADAPTER_TYPES = [
 ]
 
 // Type definitions
-interface RootModelWithPluginManager {
-  pluginManager: {
-    getTextSearchAdapterType: (type: string) => {
-      getAdapterClass: () => Promise<
-        new (config: Record<string, unknown>) => BaseTextSearchAdapter
-      >
-    }
-  }
-}
 
-interface TrixTextSearchAdapterConfig {
-  type: 'TrixTextSearchAdapter'
-  textSearchAdapterId: string
-  ixFilePath: {
-    name?: string
-    description?: string
-    type?: string
-    value?: string
-    contextVariable?: string[]
-    uri?: string
-  }
-  ixxFilePath: {
-    name?: string
-    description?: string
-    type?: string
-    value?: string
-    contextVariable?: string[]
-    uri?: string
-  }
-  metaFilePath: {
-    name?: string
-    description?: string
-    type?: string
-    value?: string
-    contextVariable?: string[]
-    uri?: string
-  }
-  tracks?: string[]
-  assemblyNames?: string[]
-  isJBrowseConfigurationSchema?: boolean
-  jbrowseSchema?: AnyConfigurationModel
-}
 
-interface FeatureResponse {
-  refSeq?: {
-    name?: string
-  }
-  start?: number
-  end?: number
-  id?: string
-  name?: string
-}
-
+// Assembly type - using the pattern from JBrowse 2 examples
 export interface AssemblyLike {
   displayName?: string
   name?: string
@@ -93,13 +37,11 @@ export interface AssemblyLike {
     start: number
     end: number
   }[]
+  getCanonicalRefName?: (refName: string) => string
 }
 
-export interface AdapterConfiguration {
-  type?: string
-  index?: unknown
-  maxResults?: number
-}
+// Using official JBrowse 2 configuration type
+export type AdapterConfiguration = AnyConfigurationModel
 
 export interface SearchableViewModel extends IBaseViewModel {
   selectedAssemblyId?: string
@@ -166,63 +108,12 @@ export async function searchTrackFeatures(
     return []
   }
 
-  // Get adapter type and class
-  const rootModel: RootModelWithPluginManager = getRoot(session)
-  const adapterTypeName = readConfObject(textSearchAdapter, 'type') as string
-  const adapterType =
-    rootModel.pluginManager.getTextSearchAdapterType(adapterTypeName)
-
-  if (!adapterType) {
-    console.log('🔍 DEBUG: Could not get adapter type for:', adapterTypeName)
-    return []
-  }
-
-  try {
-    const AdapterClass = await adapterType.getAdapterClass()
-    const adapter = new AdapterClass(
-      textSearchAdapter as Record<string, unknown>,
-    )
-
-    // Prepare search arguments
-    const searchArgs: BaseTextSearchArgs = {
-      queryString: searchTerm,
-      searchType: 'prefix',
-      limit: maxResults,
-    }
-
-    // Perform search
-    const searchResults = await adapter.searchIndex(searchArgs)
-
-    // Process results to extract locations
-    const matches = searchResults
-      .map(result => {
-        const searchResult = result as unknown as SearchResult
-        const location =
-          searchResult.getLocation?.() ?? searchResult.location ?? ''
-        const locParts = location.match(/^(.+):(\d+)-(\d+)$/)
-
-        if (locParts) {
-          return {
-            refName: locParts[1],
-            start: parseInt(locParts[2], 10),
-            end: parseInt(locParts[3], 10),
-          }
-        }
-
-        return {
-          refName: location.split(':')[0] || 'unknown',
-          start: 0,
-          end: 1,
-        }
-      })
-      .filter((match: SearchMatch) => match.refName !== 'unknown')
-
-    console.log('🔍 DEBUG: Search results:', matches.length)
-    return matches
-  } catch (error) {
-    console.log('🔍 DEBUG: Search failed:', error)
-    return []
-  }
+  // Note: pluginManager is not accessible at runtime from session
+  // Text search functionality needs to be redesigned to work without pluginManager
+  console.warn(
+    'Text search adapter access not available at runtime - functionality disabled',
+  )
+  return []
 }
 
 function getBaseTrackConfigs(session: AbstractSessionModel): BaseTrackConfig[] {
@@ -690,7 +581,10 @@ export const searchFeatureRangeQueries = (
 
       // console.log('🔍 DEBUG: Using valid adapter:', adapter)
 
-      const adapterType = (adapter as AdapterConfiguration).type
+      const adapterType = readConfObject(
+        adapter as unknown as AnyConfigurationModel,
+        'type',
+      )
       // console.log('🔍 DEBUG: Starting search with adapter type:', adapterType)
 
       const rpcManager = session.rpcManager

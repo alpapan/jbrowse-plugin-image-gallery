@@ -2,6 +2,9 @@ import Plugin from '@jbrowse/core/Plugin'
 import PluginManager from '@jbrowse/core/PluginManager'
 import ViewType from '@jbrowse/core/pluggableElementTypes/ViewType'
 import { AbstractSessionModel, isAbstractMenuManager } from '@jbrowse/core/util'
+import { AbstractRootModel } from '@jbrowse/core/util/types'
+import { Feature } from '@jbrowse/core/util/simpleFeature'
+import { IBaseViewModel } from '@jbrowse/core/pluggableElementTypes/models/BaseViewModel'
 import { autorun } from 'mobx'
 import { version } from '../package.json'
 import {
@@ -37,47 +40,6 @@ interface FeatureSummary {
   markdownUrls: string
   descriptions: string
   contentTypes: string
-}
-
-// Interface for JBrowse2 Feature-like objects
-interface JBrowseFeature {
-  get(key: string): unknown
-  subfeatures?: () => JBrowseFeature[]
-  children?: () => JBrowseFeature[]
-}
-
-// Interface for SelectImageGalleryView with its specific methods
-interface SelectImageGalleryView extends Record<string, unknown> {
-  id: string
-  type: string
-  updateFeature?: (
-    id: string,
-    type: FeatureType,
-    images: string,
-    labels: string,
-    types: string,
-  ) => void
-  updateFeatureWithoutImages?: (id: string, type: FeatureType) => void
-  clearFeature?: () => void
-}
-
-// Interface for SelectTextualDescriptionsView with its specific methods
-interface SelectTextualDescriptionsView extends Record<string, unknown> {
-  id: string
-  type: string
-  updateFeature?: (
-    id: string,
-    type: FeatureType,
-    markdownUrls: string,
-    descriptions: string,
-    contentTypes: string,
-  ) => void
-  clearFeature?: () => void
-}
-
-// Interface for rootModel with session property
-interface RootModelWithSession {
-  session?: AbstractSessionModel
 }
 
 export default class RichAnnotationsPlugin extends Plugin {
@@ -177,7 +139,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       autorun(() => {
         try {
           // Access session through the rootModel properly
-          const rootModel = pluginManager.rootModel as RootModelWithSession
+          const rootModel = pluginManager.rootModel!
           const session: AbstractSessionModel | undefined = rootModel?.session
 
           if (!session) {
@@ -191,8 +153,8 @@ export default class RichAnnotationsPlugin extends Plugin {
           if (sel) {
             // try common shapes
             const f = (sel as unknown as Record<string, unknown>).feature ?? sel
-            selectedFeature = f as unknown as JBrowseFeature
-            const feature = f as unknown as JBrowseFeature
+            selectedFeature = f as unknown as Feature
+            const feature = f as unknown as Feature
             if (feature && typeof feature.get === 'function') {
               // Collect images from the main feature and all subfeatures
               const aggregatedImageData =
@@ -296,7 +258,7 @@ export default class RichAnnotationsPlugin extends Plugin {
         ? (session.views.find(
             view =>
               view.type === 'SelectImageGalleryView' && view.id === viewId,
-          ) as unknown as SelectImageGalleryView)
+          ) as IBaseViewModel)
         : null
 
       // Only update existing views, don't create new ones
@@ -353,7 +315,7 @@ export default class RichAnnotationsPlugin extends Plugin {
         ? (session.views.find(
             view =>
               view.type === 'SelectImageGalleryView' && view.id === viewId,
-          ) as unknown as SelectImageGalleryView)
+          ) as IBaseViewModel)
         : null
 
       // Only update existing views, don't create new ones for features without images
@@ -399,7 +361,7 @@ export default class RichAnnotationsPlugin extends Plugin {
             view =>
               view.type === 'SelectTextualDescriptionsView' &&
               view.id === viewId,
-          ) as unknown as SelectTextualDescriptionsView)
+          ) as IBaseViewModel)
         : null
 
       // Only update existing views, don't create new ones
@@ -451,7 +413,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       if (session?.views) {
         const selectImageGalleryView = session.views.find(
           view => view.type === 'SelectImageGalleryView' && view.id === viewId,
-        ) as unknown as SelectImageGalleryView
+        ) as IBaseViewModel
         // Atomic clear: Only clear if view exists and has clearFeature method
         if (selectImageGalleryView?.clearFeature) {
           // Reset last selected feature to ensure clean state
@@ -475,7 +437,7 @@ export default class RichAnnotationsPlugin extends Plugin {
         const selectTextualDescriptionsView = session.views.find(
           view =>
             view.type === 'SelectTextualDescriptionsView' && view.id === viewId,
-        ) as unknown as SelectTextualDescriptionsView
+        ) as IBaseViewModel
         if (selectTextualDescriptionsView?.clearFeature) {
           selectTextualDescriptionsView.clearFeature()
         }
@@ -489,9 +451,7 @@ export default class RichAnnotationsPlugin extends Plugin {
   }
 
   // Method to collect textual content from a feature and all its subfeatures
-  private collectTextualContentFromFeatureAndSubfeatures(
-    feature: JBrowseFeature,
-  ): {
+  private collectTextualContentFromFeatureAndSubfeatures(feature: Feature): {
     markdownUrls: string
     descriptions: string
     contentTypes: string
@@ -501,7 +461,7 @@ export default class RichAnnotationsPlugin extends Plugin {
     const allContentTypes: string[] = []
 
     // Helper function to extract textual data from a feature
-    const extractTextualData = (f: JBrowseFeature) => {
+    const extractTextualData = (f: Feature) => {
       if (!f || typeof f.get !== 'function') return
 
       const markdownUrls = f.get('markdown_urls') || f.get('markdown_url')
@@ -604,14 +564,14 @@ export default class RichAnnotationsPlugin extends Plugin {
         const subfeatures =
           feature.get('subfeatures') || feature.get('children') || []
         if (Array.isArray(subfeatures)) {
-          subfeatures.forEach((subfeature: JBrowseFeature) => {
+          subfeatures.forEach((subfeature: Feature) => {
             extractTextualData(subfeature)
           })
         }
 
         const children = feature.children?.()
         if (Array.isArray(children)) {
-          children.forEach((child: JBrowseFeature) => {
+          children.forEach((child: Feature) => {
             extractTextualData(child)
           })
         }
@@ -647,7 +607,7 @@ export default class RichAnnotationsPlugin extends Plugin {
   }
 
   // Method to collect images from a feature and all its subfeatures
-  private collectImagesFromFeatureAndSubfeatures(feature: JBrowseFeature): {
+  private collectImagesFromFeatureAndSubfeatures(feature: Feature): {
     images: string
     labels: string
     types: string
@@ -657,7 +617,7 @@ export default class RichAnnotationsPlugin extends Plugin {
     const allTypes: string[] = []
 
     // Helper function to extract image data from a feature
-    const extractImageData = (f: JBrowseFeature) => {
+    const extractImageData = (f: Feature) => {
       if (!f || typeof f.get !== 'function') return
 
       const images = f.get('image') || f.get('images')
@@ -745,7 +705,7 @@ export default class RichAnnotationsPlugin extends Plugin {
         const subfeatures =
           feature.get('subfeatures') || feature.get('children') || []
         if (Array.isArray(subfeatures)) {
-          subfeatures.forEach((subfeature: JBrowseFeature) => {
+          subfeatures.forEach((subfeature: Feature) => {
             extractImageData(subfeature)
           })
         }
@@ -753,7 +713,7 @@ export default class RichAnnotationsPlugin extends Plugin {
         const children = feature.children?.()
         if (Array.isArray(children)) {
           if (Array.isArray(children)) {
-            children.forEach((child: JBrowseFeature) => {
+            children.forEach((child: Feature) => {
               extractImageData(child)
             })
           }

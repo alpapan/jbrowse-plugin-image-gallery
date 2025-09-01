@@ -128,3 +128,4 @@ cypress/screenshots
 *workspace
 test.gff3
 .kilo*
+type_docs

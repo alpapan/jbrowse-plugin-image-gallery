@@ -3,11 +3,7 @@ import { ElementId } from '@jbrowse/core/util/types/mst'
 import { types, getRoot } from 'mobx-state-tree'
 import { getSession } from '@jbrowse/core/util'
 import { getConf } from '@jbrowse/core/configuration'
-
-// Interface for root model with pluginManager
-interface RootModelWithPluginManager {
-  pluginManager: unknown
-}
+import PluginManager from '@jbrowse/core/PluginManager'
 
 // Utility function for deduplicating content arrays (generic version)
 export function deduplicateContent(content: string[]): string[] {
@@ -102,7 +98,7 @@ export const BaseViewStateModel = types
         return rootModel &&
           typeof rootModel === 'object' &&
           'pluginManager' in rootModel
-          ? (rootModel as RootModelWithPluginManager).pluginManager
+          ? (rootModel as { pluginManager: PluginManager }).pluginManager
           : null
       } catch (error) {
         // eslint-disable-next-line no-console

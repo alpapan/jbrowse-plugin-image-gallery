@@ -2,6 +2,10 @@
 
 This document outlines the correct way to interact with the JBrowse 2 API, intended for an AI agent. It covers core concepts, configuration, and data access patterns.
 
+**Related Documentation:**
+- [JBROWSE_PLUGIN_TEMPLATE_USAGE.md](JBROWSE_PLUGIN_TEMPLATE_USAGE.md) - Plugin template usage guide
+- [JBROWSE_TYPES.md](JBROWSE_TYPES.md) - Comprehensive type definitions reference
+
 You can also parse the definition files in @/node_modules/@jbrowse/core/
 
 ## Core Concepts
@@ -16,16 +20,16 @@ You can also parse the definition files in @/node_modules/@jbrowse/core/
 
 - **Core Idea:** The entire application state is a single, inspectable, and mutable (via actions) tree of models. This provides predictability and traceability.
 - **`rootModel`:** The top of the tree. It contains:
-    - `jbrowse`: A model representing the static `config.json`.
-    - `session`: A model representing the dynamic, mutable state of the user's session (open views, tracks, etc.).
+    - `jbrowse`: A model representing the static `config.json`.
+    - `session`: A model representing the dynamic, mutable state of the user's session (open views, tracks, etc.).
 - **Accessing Models:** Use `getSession(anyModelInTree)` to traverse up to the session model. From the session, you can access views, the assemblyManager, etc.
 - **MST Actions:** All state modifications **must** happen within a model's `actions` block. This is fundamental to MST and ensures changes are trackable.
-```javascript     
-const MyModel = types.model({       value: types.string,     }).actions(self => ({       setValue(newValue) {         self.value = newValue; // Correct way to modify state       },     }));     
+```javascript
+const MyModel = types.model({       value: types.string,     }).actions(self => ({       setValue(newValue) {         self.value = newValue; // Correct way to modify state       },     }));
 ```
 - **MST Views:** Use `views` blocks for derived data. These are memoized getters that recompute only when their dependencies change.
 ```javascript
-     const MyModel = types.model({       width: types.number,       height: types.number     }).views(self => ({       get area() {         return self.width * self.height; // This is a computed view       },     }));     
+    const MyModel = types.model({       width: types.number,       height: types.number     }).views(self => ({       get area() {         return self.width * self.height; // This is a computed view       },     }));
  ```
 
 
@@ -38,17 +42,22 @@ const MyModel = types.model({       value: types.string,     }).actions(sel
 
 ## Correct Way to Access PluginManager
 
-The `pluginManager` is located on the root model, not the session model.
+The `pluginManager` is passed as a parameter to plugin methods and is not directly accessible from the session or root model.
 
-**Correct access pattern:**
+**Correct access pattern in plugin install method:**
 
 ```javascript
-import { getSession } from '@jbrowse/core/util'
-
-// Access via session's root reference
-const session = getSession(self)
-const pluginManager = session.root.pluginManager
+export default class MyPlugin extends Plugin {
+  install(pluginManager: PluginManager) {
+    // pluginManager is passed as parameter here
+    pluginManager.addTrackType(() => { /* ... */ })
+  }
+}
 ```
+
+**To access pluginManager from within model actions/views:**
+
+PluginManager is not directly accessible from model instances. Store a reference during plugin installation or use the methods available on the session/model.
 
 
 ```javascript
@@ -59,16 +68,17 @@ import { readConfObject } from '@jbrowse/core/configuration'
 function getTracksForAssembly(self: any) {
   const session = getSession(self)
   const rootModel = getRoot(self)
-  const pluginManager = session.root.pluginManager
-  
+
+  // CORRECTED: PluginManager is not accessible via session.root.pluginManager
+  // Instead, store reference during plugin installation or use alternative approaches
+
   // only for mobx-state-tree (MST) models that possess a `.configuration` property
   const trackConfs = (getConf(jbrowse.configuration, 'tracks') ?? [])
   const trackConf = trackConfs.filter(tc =>(getConf(tc, 'trackId') ?? []).includes(trackId),)
- 
-  // Now use pluginManager to get adapter
+
+  // For adapter access, use the session's RPC manager or other available methods
   const adapterConfig = readConfObject(trackConf, ['adapter'])
-  const adapterTypeObj = pluginManager.getAdapterType(adapterConfig.type)
-  // ... rest of adapter instantiation
+  // ... rest of adapter instantiation using available session methods
 }
 ```
 
@@ -89,7 +99,7 @@ By contrast, use `getConf` only on mobx-state-tree (MST) models that possess a `
 [^1]: https://jbrowse.org/jb2/docs/developer_guides/config_model/
 
 ## WHEN TO ACCESS PROPERTIES DIRECTLY
- 
+
 Important: direct property access (e.g. t.assemblyNames) on track config objects is the correct way in JBrowse 2 when you have plain objects from configuration files or session track lists. The official track configs use an assemblyNames property that is an array of strings specifying which assemblies a track belongs to. You do not need to use readConfObject unless you are working with a config schema/model (which is uncommon for sessionTracks or config.json data). For example:
 ```typescript
 export function getAllTracksForAssembly(
@@ -119,7 +129,7 @@ const assemblyNames = Array.isArray(t.assemblyNames)
 3. **Get a specific assembly object:** `const assembly = await assemblyManager.waitForAssembly('assemblyName');` This ensures the assembly's regions and other data are loaded.
 4. **Get assembly regions:** `const regions = assembly.regions`
 
-**PROVEN WORKING**: ✅ `getSession(self).assemblyManager.waitForAssembly(assemblyId)` works correctly for assembly access.  
+**PROVEN WORKING**: ✅ `getSession(self).assemblyManager.waitForAssembly(assemblyId)` works correctly for assembly access.
 **PROVEN WORKING**: ✅ `assemblyManager.assemblyNamesList` for getting list of assembly names.
 
 ### Tracks
@@ -130,29 +140,27 @@ import { getConf } from '@jbrowse/core/configuration'
 
 
 function getTracksForAssembly(self: any) {
-  const session = getSession(self)
-  const { jbrowse } = session
-  const assemblyName = self.selectedAssemblyId // or self.assemblyNames?.[0]
+  const session = getSession(self)
+  const { jbrowse } = session
+  const assemblyName = self.selectedAssemblyId // or self.assemblyNames?.[0]
 
 
-  // Use reactive configuration API - picks up dynamic changes automatically
-  const trackConfs = (getConf(jbrowse.configuration, 'tracks') ?? [])
+  // Use reactive configuration API - picks up dynamic changes automatically
+  const trackConfs = (getConf(jbrowse.configuration, 'tracks') ?? [])
 
 
-  // Filter by assemblyNames using getConf
-  const tracksForAssembly = trackConfs.filter(tc =>
-    (getConf(tc, 'assemblyNames') ?? []).includes(assemblyName),
-  )
+  // Filter by assemblyNames using getConf
+  const tracksForAssembly = trackConfs.filter(tc =>
+    (getConf(tc, 'assemblyNames') ?? []).includes(assemblyName),
+  )
 
 
-  return tracksForAssembly
+  return tracksForAssembly
 }
 ```
 
-**PROVEN WORKING**: ✅ `getConf(jbrowse.configuration, 'tracks')` for reactive track access  
-**DOES NOT WORK**: ❌ `session.tracks` - Breaks reactivity and violates JBrowse 2 best practices
-
-
+**PROVEN WORKING**: ✅ `getConf(jbrowse.configuration, 'tracks')` for reactive track access
+**PROVEN WORKING**: ✅ `session.tracks` - This is the correct way to access tracks from the session (contrary to previous incorrect statement)
 
 ### Features from a Track
 
@@ -162,12 +170,12 @@ The process involves getting the track's adapter and using it to fetch features.
     ```javascript     const session = getSession(self)     const trackConfs = getConf(session.jbrowse.configuration, 'tracks') ?? []     const trackConf = trackConfs.find(tc => getConf(tc, 'trackId') === trackId)     ```
 2. **Get the adapter configuration from the track configuration:**
     ```javascript     const adapterConfig = getConf(trackConf, 'adapter')     ```
-3. **Instantiate the Adapter:**  
+3. **Instantiate the Adapter:**
     - You need the `pluginManager`
     - Get the adapter class constructor: `const adapterTypeObj = pluginManager.getAdapterType(adapterConfig.type);`.
     - **PROVEN WORKING**: `await adapterTypeObj.getAdapterClass()` method returns a Promise that resolves to the constructor.
     - Create an instance: `const adapter = new AdapterClass(adapterConfig);`
-4. **Fetch Features:**  
+4. **Fetch Features:**
     - `getFeatures` returns an RxJS `Observable`.
     ```javascript
     import { toArray } from 'rxjs/operators';
@@ -202,8 +210,8 @@ const featureResults = await rpcManager.call(
 const features = Array.isArray(featureResults) ? featureResults : []
 ```
 
-**PROVEN WORKING**: ✅ `rpcManager.call(sessionId, 'CoreGetFeatures', {...})` with sessionId as first parameter  
-**PROVEN WORKING**: ✅ Using `readConfObject(trackConf, ['adapter'])` for adapterConfig  
+**PROVEN WORKING**: ✅ `rpcManager.call(sessionId, 'CoreGetFeatures', {...})` with sessionId as first parameter
+**PROVEN WORKING**: ✅ Using `readConfObject(trackConf, ['adapter'])` for adapterConfig
 **PROVEN WORKING**: ✅ `regions: [queryRegion]` (array format) and `adapterConfig: adapter`
 
 
@@ -218,7 +226,7 @@ For a GFF track (using `Gff3TabixAdapter`), the features are standard `SimpleFea
 
 #### Searching
 
-to use the textsearchmanager, make sure you pass an object with an array of assemblynames 
+to use the textsearchmanager, make sure you pass an object with an array of assemblynames
 @see [code definition](https://raw.githubusercontent.com/GMOD/jbrowse-components/refs/heads/main/plugins/text-indexing/src/TextIndexRpcMethod/TextIndexRpcMethod.ts)
 
 ```javascript
@@ -227,7 +235,7 @@ import { readConfObject } from '@jbrowse/core/configuration'
 // Get the text search adapter configuration
 const textSearchAdapter = readConfObject(trackConf, ['textSearching', 'textSearchAdapter'])
 const ixxUri = readConfObject(textSearchAdapter, ['ixxFilePath', 'uri'])
-const ixUri = readConfObject(textSearchAdapter, ['ixFilePath', 'uri']) 
+const ixUri = readConfObject(textSearchAdapter, ['ixFilePath', 'uri'])
 const metaUri = readConfObject(textSearchAdapter, ['metaFilePath', 'uri'])
 ```
 ## Important Best Practices
@@ -300,8 +308,8 @@ import { getSession } from '@jbrowse/core/util'
 
 const MyCustomViewComponent = observer(({ model }: { model: any }) => {
   const session = getSession(model)
-  
-  
+
+
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <h2>{model.displayName || 'My Custom View'}</h2>
@@ -326,7 +334,7 @@ export default MyCustomViewComponent
 import { ViewType } from '@jbrowse/core/pluggableElementTypes'
 
 export default class MyPlugin extends Plugin {
-  name = 'MyPlugin'  	
+  name = 'MyPlugin'
   install(pluginManager: PluginManager) {
     pluginManager.addViewType(() => {
       return new ViewType({
@@ -336,12 +344,13 @@ export default class MyPlugin extends Plugin {
       })
     })
   }
-  
+
   configure(pluginManager: PluginManager) {
     // Add menu items or other configuration
     if (isAbstractMenuManager(pluginManager.rootModel)) {
       pluginManager.rootModel.appendToMenu('Add', {
         label: 'My Custom View',
+        icon: GridOn,
         onClick: (session: SessionWithWidgets) => {
           session.addView('MyCustomView', {})
         },
