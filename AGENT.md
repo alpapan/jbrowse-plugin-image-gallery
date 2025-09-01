@@ -222,19 +222,13 @@ to use the textsearchmanager, make sure you pass an object with an array of asse
 @see [code definition](https://raw.githubusercontent.com/GMOD/jbrowse-components/refs/heads/main/plugins/text-indexing/src/TextIndexRpcMethod/TextIndexRpcMethod.ts)
 
 ```javascript
-      const tsm = session?.textSearchManager
-      let matches: SearchMatch[] = []
+import { readConfObject } from '@jbrowse/core/configuration'
 
-      try {
-        matches =
-          (yield tsm.search(searchTerm, {
-            assemblyNames: [self.selectedAssemblyId],
-          })) ?? []
-        console.log('🔍 DEBUG: TextSearch returned:', matches.length, 'matches')
-      } catch (error) {
-        console.log('🔍 DEBUG: TextSearchManager failed:', String(error))
-        matches = []
-      }
+// Get the text search adapter configuration
+const textSearchAdapter = readConfObject(trackConf, ['textSearching', 'textSearchAdapter'])
+const ixxUri = readConfObject(textSearchAdapter, ['ixxFilePath', 'uri'])
+const ixUri = readConfObject(textSearchAdapter, ['ixFilePath', 'uri']) 
+const metaUri = readConfObject(textSearchAdapter, ['metaFilePath', 'uri'])
 ```
 ## Important Best Practices
 

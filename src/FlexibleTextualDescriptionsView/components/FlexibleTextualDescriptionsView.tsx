@@ -139,13 +139,16 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
     }, [model.searchTerm, searchInputValue])
 
     const handleAssemblyChange = (assemblyId: string) => {
-      console.log('🎯 DEBUG: TextualDescriptionsView handleAssemblyChange called with:', assemblyId)
-      console.log('🎯 DEBUG: model.setSelectedAssembly exists:', typeof model.setSelectedAssembly)
-      console.log('🎯 DEBUG: model object:', Object.keys(model))
+      // console.log('🎯 DEBUG: TextualDescriptionsView handleAssemblyChange called with:', assemblyId)
+      // console.log('🎯 DEBUG: model.setSelectedAssembly exists:', typeof model.setSelectedAssembly)
+      // console.log('🎯 DEBUG: model object:', Object.keys(model))
       if (typeof model.setSelectedAssembly === 'function') {
         model.setSelectedAssembly(assemblyId ?? undefined)
       } else {
-        console.error('🎯 DEBUG: model.setSelectedAssembly is not a function!', typeof model.setSelectedAssembly)
+        console.error(
+          '🎯 DEBUG: model.setSelectedAssembly is not a function!',
+          typeof model.setSelectedAssembly,
+        )
       }
     }
 

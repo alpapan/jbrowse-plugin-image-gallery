@@ -157,7 +157,6 @@ const stateModel: IAnyStateTreeNode = BaseViewStateModel.props({
       const maxItems = Number(self.maxItems) || 0
       return maxItems > 0 ? uniqueImages.slice(0, maxItems) : uniqueImages
     },
-
   }))
 
 export type SelectImageGalleryViewModel = Instance<typeof stateModel>

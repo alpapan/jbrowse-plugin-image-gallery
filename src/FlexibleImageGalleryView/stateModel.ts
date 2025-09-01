@@ -71,13 +71,13 @@ const stateModel = types
       labels?: string,
       types_?: string,
     ) {
-      console.log('DEBUG: ImageGalleryView.updateFeature called with:', {
-        featureId,
-        featureType,
-        images,
-        labels,
-        types_,
-      })
+      // console.log('DEBUG: ImageGalleryView.updateFeature called with:', {
+      //   featureId,
+      //   featureType,
+      //   images,
+      //   labels,
+      //   types_,
+      // })
       // Validate input - featureId is required, but content can be empty
       if (!featureId) {
         return
@@ -92,7 +92,7 @@ const stateModel = types
     },
 
     clearFeature() {
-      console.log('DEBUG: ImageGalleryView.clearFeature called')
+      // console.log('DEBUG: ImageGalleryView.clearFeature called')
       // Set selectedFeatureId to undefined (types.maybe allows this)
       // Set content fields to appropriate defaults (subclasses handle specifics)
       self.selectedFeatureId = undefined
@@ -104,10 +104,10 @@ const stateModel = types
 
     // Implement component-expected methods directly
     setSelectedAssembly(assemblyId: string) {
-      console.log(
-        'DEBUG: ImageGalleryView.setSelectedAssembly called with:',
-        assemblyId,
-      )
+      // console.log(
+      //   'DEBUG: ImageGalleryView.setSelectedAssembly called with:',
+      //   assemblyId,
+      // )
       self.selectedAssemblyId = assemblyId
       self.selectedTrackId = undefined
       self.searchResults.clear()
@@ -116,10 +116,10 @@ const stateModel = types
     },
 
     setSelectedTrack(trackId: string) {
-      console.log(
-        'DEBUG: ImageGalleryView.setSelectedTrack called with:',
-        trackId,
-      )
+      // console.log(
+      //   'DEBUG: ImageGalleryView.setSelectedTrack called with:',
+      //   trackId,
+      // )
       self.selectedTrackId = trackId
       self.searchResults.clear()
       self.selectedFeatureId = undefined
@@ -127,15 +127,15 @@ const stateModel = types
     },
 
     setSearchText(searchTerm: string) {
-      console.log(
-        'DEBUG: ImageGalleryView.setSearchText called with:',
-        searchTerm,
-      )
+      // console.log(
+      //   'DEBUG: ImageGalleryView.setSearchText called with:',
+      //   searchTerm,
+      // )
       self.searchTerm = searchTerm
     },
 
     clearSearch() {
-      console.log('DEBUG: ImageGalleryView.clearSearch called')
+      // console.log('DEBUG: ImageGalleryView.clearSearch called')
       self.searchTerm = ''
       self.searchResults.clear()
       self.selectedFeatureId = undefined
@@ -143,11 +143,11 @@ const stateModel = types
     },
 
     selectFeature(featureId: string, featureType: string) {
-      console.log(
-        'DEBUG: ImageGalleryView.selectFeature called with:',
-        featureId,
-        featureType,
-      )
+      // console.log(
+      //   'DEBUG: ImageGalleryView.selectFeature called with:',
+      //   featureId,
+      //   featureType,
+      // )
       self.selectedFeatureId = featureId
       self.selectedFeatureType = featureType
     },
@@ -159,13 +159,13 @@ const stateModel = types
       labels?: string,
       types_?: string,
     ) {
-      console.log('DEBUG: ImageGalleryView.setSelectedFeature called with:', {
-        featureId,
-        featureType,
-        images,
-        labels,
-        types_,
-      })
+      // console.log('DEBUG: ImageGalleryView.setSelectedFeature called with:', {
+      //   featureId,
+      //   featureType,
+      //   images,
+      //   labels,
+      //   types_,
+      // })
       if (featureId) {
         self.selectedFeatureId = featureId
         self.selectedFeatureType = featureType ?? 'GENE'
@@ -182,10 +182,10 @@ const stateModel = types
     },
 
     selectFeatureWithImageData(featureId: string | undefined) {
-      console.log(
-        'DEBUG: ImageGalleryView.selectFeatureWithImageData called with:',
-        featureId,
-      )
+      // console.log(
+      //   'DEBUG: ImageGalleryView.selectFeatureWithImageData called with:',
+      //   featureId,
+      // )
       if (featureId) {
         // Find the feature in search results to get its image data
         const feature = self.searchResults.find(
@@ -209,7 +209,7 @@ const stateModel = types
     },
 
     clearFeatureSelection() {
-      console.log('DEBUG: ImageGalleryView.clearFeatureSelection called')
+      // console.log('DEBUG: ImageGalleryView.clearFeatureSelection called')
       self.selectedFeatureId = undefined
       self.selectedFeatureType = 'GENE'
       self.featureImages = undefined
@@ -218,7 +218,7 @@ const stateModel = types
     },
 
     clearSelections() {
-      console.log('DEBUG: ImageGalleryView.clearSelections called')
+      // console.log('DEBUG: ImageGalleryView.clearSelections called')
       self.selectedAssemblyId = undefined
       self.selectedTrackId = undefined
       self.searchTerm = ''
@@ -231,10 +231,10 @@ const stateModel = types
     },
 
     setLoadingFeatures(loading: boolean) {
-      console.log(
-        'DEBUG: ImageGalleryView.setLoadingFeatures called with:',
-        loading,
-      )
+      // console.log(
+      //   'DEBUG: ImageGalleryView.setLoadingFeatures called with:',
+      //   loading,
+      // )
       self.isLoadingFeatures = loading
     },
 

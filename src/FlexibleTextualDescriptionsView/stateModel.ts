@@ -64,10 +64,10 @@ const stateModel = types
 
     // Implement component-expected methods directly
     setSelectedAssembly(assemblyId: string) {
-      console.log(
-        'DEBUG: TextualDescriptionsView.setSelectedAssembly called with:',
-        assemblyId,
-      )
+      // console.log(
+      //   'DEBUG: TextualDescriptionsView.setSelectedAssembly called with:',
+      //   assemblyId,
+      // )
       self.selectedAssemblyId = assemblyId
       self.selectedTrackId = undefined
       self.searchResults.clear()
@@ -76,10 +76,10 @@ const stateModel = types
     },
 
     setSelectedTrack(trackId: string) {
-      console.log(
-        'DEBUG: TextualDescriptionsView.setSelectedTrack called with:',
-        trackId,
-      )
+      // console.log(
+      //   'DEBUG: TextualDescriptionsView.setSelectedTrack called with:',
+      //   trackId,
+      // )
       self.selectedTrackId = trackId
       self.searchResults.clear()
       self.selectedFeatureId = undefined
@@ -87,15 +87,15 @@ const stateModel = types
     },
 
     setSearchTerm(searchTerm: string) {
-      console.log(
-        'DEBUG: TextualDescriptionsView.setSearchTerm called with:',
-        searchTerm,
-      )
+      // console.log(
+      //   'DEBUG: TextualDescriptionsView.setSearchTerm called with:',
+      //   searchTerm,
+      // )
       self.searchTerm = searchTerm
     },
 
     clearSearch() {
-      console.log('DEBUG: TextualDescriptionsView.clearSearch called')
+      // console.log('DEBUG: TextualDescriptionsView.clearSearch called')
       self.searchTerm = ''
       self.searchResults.clear()
       self.selectedFeatureId = undefined
@@ -103,11 +103,11 @@ const stateModel = types
     },
 
     selectFeature(featureId: string, featureType: string) {
-      console.log(
-        'DEBUG: TextualDescriptionsView.selectFeature called with:',
-        featureId,
-        featureType,
-      )
+      // console.log(
+      //   'DEBUG: TextualDescriptionsView.selectFeature called with:',
+      //   featureId,
+      //   featureType,
+      // )
       self.selectedFeatureId = featureId
       self.selectedFeatureType = featureType
     },
@@ -119,10 +119,10 @@ const stateModel = types
       descriptions?: string,
       contentTypes?: string,
     ) {
-      console.log(
-        'DEBUG: TextualDescriptionsView.setSelectedFeature called with:',
-        { featureId, featureType, markdownUrls, descriptions, contentTypes },
-      )
+      // console.log(
+      //   'DEBUG: TextualDescriptionsView.setSelectedFeature called with:',
+      //   { featureId, featureType, markdownUrls, descriptions, contentTypes },
+      // )
       if (featureId) {
         self.selectedFeatureId = featureId
         self.selectedFeatureType = featureType ?? 'GENE'
@@ -139,7 +139,7 @@ const stateModel = types
     },
 
     clearFeatureSelection() {
-      console.log('DEBUG: TextualDescriptionsView.clearFeatureSelection called')
+      // console.log('DEBUG: TextualDescriptionsView.clearFeatureSelection called')
       self.selectedFeatureId = undefined
       self.selectedFeatureType = 'GENE'
       self.featureMarkdownUrls = undefined
@@ -148,7 +148,7 @@ const stateModel = types
     },
 
     clearSelections() {
-      console.log('DEBUG: TextualDescriptionsView.clearSelections called')
+      // console.log('DEBUG: TextualDescriptionsView.clearSelections called')
       self.selectedAssemblyId = undefined
       self.selectedTrackId = undefined
       self.searchTerm = ''
@@ -161,10 +161,10 @@ const stateModel = types
     },
 
     setLoadingFeatures(loading: boolean) {
-      console.log(
-        'DEBUG: TextualDescriptionsView.setLoadingFeatures called with:',
-        loading,
-      )
+      // console.log(
+      //   'DEBUG: TextualDescriptionsView.setLoadingFeatures called with:',
+      //   loading,
+      // )
       self.isLoadingFeatures = loading
     },
 
@@ -178,10 +178,10 @@ const stateModel = types
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const results = yield searchFeatureTextIndex()(self)
-        console.log(
-          'DEBUG: TextualDescriptionsView.searchFeatures results:',
-          results?.length || 0,
-        )
+        // console.log(
+        //   'DEBUG: TextualDescriptionsView.searchFeatures results:',
+        //   results?.length || 0,
+        // )
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         self.searchResults.replace(results as SearchFeature[])
       } catch (e) {

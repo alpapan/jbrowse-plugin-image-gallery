@@ -1,9 +1,20 @@
 // Shared utilities for FlexibleImageGalleryView and FlexibleTextualDescriptionsView
-import { flow } from 'mobx-state-tree'
-import { getSession } from '@jbrowse/core/util'
-import { readConfObject } from '@jbrowse/core/configuration'
+import { flow, getRoot } from 'mobx-state-tree'
+import { getSession, AbstractSessionModel } from '@jbrowse/core/util'
+import {
+  readConfObject,
+  AnyConfigurationModel,
+  getConf,
+} from '@jbrowse/core/configuration'
 import type { Region } from '@jbrowse/core/util/types'
 import type { Feature } from '@jbrowse/core/util/simpleFeature'
+import type TextSearchManager from '@jbrowse/core/TextSearch/TextSearchManager'
+import type {
+  BaseTextSearchArgs,
+  BaseTextSearchAdapter,
+} from '@jbrowse/core/data_adapters/BaseAdapter'
+import type { BaseTrackConfig } from '@jbrowse/core/pluggableElementTypes/models'
+import type { IBaseViewModel } from '@jbrowse/core/pluggableElementTypes/models'
 
 // Constants used by feature searches
 const FEATURE_SEARCH_MAX_RESULTS = 5
@@ -19,6 +30,49 @@ const COMPATIBLE_ADAPTER_TYPES = [
 ]
 
 // Type definitions
+interface RootModelWithPluginManager {
+  pluginManager: {
+    getTextSearchAdapterType: (type: string) => {
+      getAdapterClass: () => Promise<
+        new (config: Record<string, unknown>) => BaseTextSearchAdapter
+      >
+    }
+  }
+}
+
+interface TrixTextSearchAdapterConfig {
+  type: 'TrixTextSearchAdapter'
+  textSearchAdapterId: string
+  ixFilePath: {
+    name?: string
+    description?: string
+    type?: string
+    value?: string
+    contextVariable?: string[]
+    uri?: string
+  }
+  ixxFilePath: {
+    name?: string
+    description?: string
+    type?: string
+    value?: string
+    contextVariable?: string[]
+    uri?: string
+  }
+  metaFilePath: {
+    name?: string
+    description?: string
+    type?: string
+    value?: string
+    contextVariable?: string[]
+    uri?: string
+  }
+  tracks?: string[]
+  assemblyNames?: string[]
+  isJBrowseConfigurationSchema?: boolean
+  jbrowseSchema?: AnyConfigurationModel
+}
+
 interface FeatureResponse {
   refSeq?: {
     name?: string
@@ -41,51 +95,13 @@ export interface AssemblyLike {
   }[]
 }
 
-// Base interface for plain track objects
-export interface BaseTrackConfiguration extends Record<string, unknown> {
-  trackId?: string
-  name?: string
-  adapter?: AdapterConfiguration
-  assemblyNames?: string | string[]
-  configuration?: {
-    trackId?: string
-    name?: string
-    adapter?: AdapterConfiguration
-    assemblyNames?: string | string[]
-  }
-}
-
-// Interface for JBrowse 2 MobX state tree nodes
-export interface JBrowseMobXTrackConfiguration extends BaseTrackConfiguration {
-  setSubschema: (
-    slotName: string,
-    data: Record<string, unknown>,
-  ) =>
-    | Record<string, unknown>
-    | (Record<string, unknown> & {
-        setSubschema: (
-          slotName: string,
-          data: Record<string, unknown>,
-        ) => unknown
-      })
-}
-
-// Union type for either case
-export type TrackConfiguration =
-  | BaseTrackConfiguration
-  | JBrowseMobXTrackConfiguration
-
 export interface AdapterConfiguration {
   type?: string
   index?: unknown
+  maxResults?: number
 }
 
-export interface FeatureLike {
-  get?(key: string): unknown
-  id?(): string
-}
-
-export interface SearchableViewModel {
+export interface SearchableViewModel extends IBaseViewModel {
   selectedAssemblyId?: string
   selectedTrackId?: string
   searchText?: string
@@ -101,35 +117,8 @@ export interface SearchResult {
   name: string
   type: string
   location: string
+  getLocation?: () => string
   [key: string]: unknown
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface SessionLike extends Record<string, any> {
-  assemblyManager: {
-    waitForAssembly: (assemblyId: string) => Promise<AssemblyLike>
-  }
-  jbrowse: {
-    tracks: boolean
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    configuration: any
-  }
-  sessionTracks?: TrackConfiguration[]
-  tracks?: TrackConfiguration[]
-  rpcManager: {
-    call: (
-      sessionId: string,
-      method: string,
-      params: unknown,
-    ) => Promise<unknown>
-  }
-  id: string
-  textSearchManager?: {
-    search: (
-      query: string | { assemblyNames: string; trackId: string; query: string },
-      options?: { assemblyNames?: string[] },
-    ) => Promise<SearchMatch[]>
-  }
 }
 
 export interface SearchMatch {
@@ -157,37 +146,115 @@ export interface TrackInfo {
   isCompatible: boolean
 }
 
+//////////////////////////////////////////////////////
 // Helper functions
-function getTrackConfigurations(session: any): TrackConfiguration[] {
+////////////////////////////////////////////////////
+export async function searchTrackFeatures(
+  session: AbstractSessionModel,
+  trackConf: AnyConfigurationModel,
+  searchTerm: string,
+  maxResults = 100,
+): Promise<SearchMatch[]> {
+  // Get text search adapter configuration
+  const textSearchAdapter = readConfObject(trackConf, [
+    'textSearching',
+    'textSearchAdapter',
+  ])
+
+  if (!textSearchAdapter) {
+    console.log('🔍 DEBUG: No textSearchAdapter found')
+    return []
+  }
+
+  // Get adapter type and class
+  const rootModel: RootModelWithPluginManager = getRoot(session)
+  const adapterTypeName = readConfObject(textSearchAdapter, 'type') as string
+  const adapterType =
+    rootModel.pluginManager.getTextSearchAdapterType(adapterTypeName)
+
+  if (!adapterType) {
+    console.log('🔍 DEBUG: Could not get adapter type for:', adapterTypeName)
+    return []
+  }
+
+  try {
+    const AdapterClass = await adapterType.getAdapterClass()
+    const adapter = new AdapterClass(
+      textSearchAdapter as Record<string, unknown>,
+    )
+
+    // Prepare search arguments
+    const searchArgs: BaseTextSearchArgs = {
+      queryString: searchTerm,
+      searchType: 'prefix',
+      limit: maxResults,
+    }
+
+    // Perform search
+    const searchResults = await adapter.searchIndex(searchArgs)
+
+    // Process results to extract locations
+    const matches = searchResults
+      .map(result => {
+        const searchResult = result as unknown as SearchResult
+        const location =
+          searchResult.getLocation?.() ?? searchResult.location ?? ''
+        const locParts = location.match(/^(.+):(\d+)-(\d+)$/)
+
+        if (locParts) {
+          return {
+            refName: locParts[1],
+            start: parseInt(locParts[2], 10),
+            end: parseInt(locParts[3], 10),
+          }
+        }
+
+        return {
+          refName: location.split(':')[0] || 'unknown',
+          start: 0,
+          end: 1,
+        }
+      })
+      .filter((match: SearchMatch) => match.refName !== 'unknown')
+
+    console.log('🔍 DEBUG: Search results:', matches.length)
+    return matches
+  } catch (error) {
+    console.log('🔍 DEBUG: Search failed:', error)
+    return []
+  }
+}
+
+function getBaseTrackConfigs(session: AbstractSessionModel): BaseTrackConfig[] {
   const { jbrowse } = session
-  let trackConfs: TrackConfiguration[] = []
+  let trackConfs: BaseTrackConfig[] = []
 
   try {
     // Try multiple ways to access tracks
     if (jbrowse?.configuration && 'tracks' in jbrowse.configuration) {
       trackConfs = jbrowse.configuration.tracks || []
-      console.log(
-        '🔍 DEBUG: Found config tracks via configuration:',
-        trackConfs.length,
-      )
+      // console.log(
+      //   '🔍 DEBUG: Found config tracks via configuration:',
+      //   trackConfs.length,
+      // )
     } else if (jbrowse?.tracks && Array.isArray(jbrowse.tracks)) {
       trackConfs = jbrowse.tracks
-      console.log(
-        '🔍 DEBUG: Found config tracks via jbrowse.tracks:',
-        trackConfs.length,
-      )
+      // console.log(
+      //   '🔍 DEBUG: Found config tracks via jbrowse.tracks:',
+      //   trackConfs.length,
+      // )
     }
 
     // Add session tracks
     const sessionTracks = session.sessionTracks ?? session.tracks ?? []
     if (sessionTracks.length > 0) {
       trackConfs = [...trackConfs, ...sessionTracks]
-      console.log(
-        '🔍 DEBUG: Added session tracks:',
-        sessionTracks.length,
-        'total:',
-        trackConfs.length,
-      )
+      // console.log(
+      //   '🔍 DEBUG: Added session tracks:',
+      //   sessionTracks.length,
+      //   'total:',
+      //   trackConfs.length,
+      // )
     }
   } catch (error) {
     console.warn(
@@ -197,20 +264,18 @@ function getTrackConfigurations(session: any): TrackConfiguration[] {
     trackConfs = []
   }
 
-  console.log('🔍 DEBUG: Final track configurations:', trackConfs.length)
+  // console.log('🔍 DEBUG: Final track configurations:', trackConfs.length)
   return trackConfs
 }
 
 function findTrackById(
-  trackConfs: TrackConfiguration[],
+  trackConfs: BaseTrackConfig[],
   trackId: string,
-): TrackConfiguration | undefined {
-  return trackConfs.find((tc: TrackConfiguration) => {
+): BaseTrackConfig | undefined {
+  return trackConfs.find((tc: BaseTrackConfig) => {
     try {
       if ('setSubschema' in tc && typeof tc.setSubschema === 'function') {
-        const id = readConfObject(tc as JBrowseMobXTrackConfiguration, [
-          'trackId',
-        ])
+        const id = readConfObject(tc, ['trackId'])
         return id === trackId
       } else {
         return tc.trackId === trackId || tc.configuration?.trackId === trackId
@@ -221,21 +286,21 @@ function findTrackById(
   })
 }
 
-function safeGetAdapter(trackConf: TrackConfiguration): unknown {
-  console.log(
-    '🔍 DEBUG: safeGetAdapter called with trackConf keys:',
-    Object.keys(trackConf),
-  )
+function safeGetAdapter(trackConf: BaseTrackConfig): unknown {
+  // console.log(
+  //   '🔍 DEBUG: safeGetAdapter called with trackConf keys:',
+  //   Object.keys(trackConf),
+  // )
 
   let adapter: unknown = undefined
 
   // First, try direct property access
   adapter = trackConf.adapter
   if (adapter) {
-    console.log('🔍 DEBUG: Found adapter via direct access:', adapter)
+    // console.log('🔍 DEBUG: Found adapter via direct access:', adapter)
   } else if (trackConf.configuration?.adapter) {
     adapter = trackConf.configuration.adapter
-    console.log('🔍 DEBUG: Found adapter via configuration:', adapter)
+    // console.log('🔍 DEBUG: Found adapter via configuration:', adapter)
   }
 
   // If no direct access, try readConfObject for MobX objects
@@ -245,12 +310,10 @@ function safeGetAdapter(trackConf: TrackConfiguration): unknown {
     typeof trackConf.setSubschema === 'function'
   ) {
     try {
-      adapter = readConfObject(trackConf as JBrowseMobXTrackConfiguration, [
-        'adapter',
-      ])
-      console.log('🔍 DEBUG: Found adapter via readConfObject:', adapter)
+      adapter = readConfObject(trackConf, ['adapter'])
+      // console.log('🔍 DEBUG: Found adapter via readConfObject:', adapter)
     } catch (error) {
-      console.log('🔍 DEBUG: readConfObject failed:', error)
+      // console.log('🔍 DEBUG: readConfObject failed:', error)
     }
   }
 
@@ -298,31 +361,31 @@ export function getAssemblyDisplayName(assembly: any): string {
 // Return all track objects (config-defined + session-added) for a given assembly
 // Return all track objects (config-defined + session-added) for a given assembly
 export function getAllTracksForAssembly(
-  self: { session?: SessionLike } | SessionLike,
+  self: { session?: AbstractSessionModel } | AbstractSessionModel,
   requestedAssemblyName: string,
-): TrackConfiguration[] {
-  console.log(
-    '[FlexibleViewUtils] getAllTracksForAssembly called with assemblyName:',
-    requestedAssemblyName,
-  )
+): BaseTrackConfig[] {
+  // console.log(
+  //   '[FlexibleViewUtils] getAllTracksForAssembly called with assemblyName:',
+  //   requestedAssemblyName,
+  // )
 
   const session =
     'session' in self && self.session
       ? self.session
       : getSession(self as Parameters<typeof getSession>[0])
 
-  console.log('🔧 DEBUG: Session obtained:', !!session)
+  // console.log('🔧 DEBUG: Session obtained:', !!session)
 
-  let allConfigTracks: TrackConfiguration[] = []
+  let allConfigTracks: BaseTrackConfig[] = []
 
   // Get config tracks - use direct access to avoid getConf type errors
   try {
     if (session.jbrowse?.tracks && Array.isArray(session.jbrowse.tracks)) {
       allConfigTracks = session.jbrowse.tracks
-      console.log(
-        '[FlexibleViewUtils] Found tracks via jbrowse.tracks:',
-        allConfigTracks.length,
-      )
+      // console.log(
+      //   '[FlexibleViewUtils] Found tracks via jbrowse.tracks:',
+      //   allConfigTracks.length,
+      // )
     }
   } catch (error) {
     console.warn('[FlexibleViewUtils] Error accessing config tracks:', error)
@@ -330,15 +393,15 @@ export function getAllTracksForAssembly(
   }
 
   // Get session-added tracks
-  let allSessionTracks: TrackConfiguration[] = []
+  let allSessionTracks: BaseTrackConfig[] = []
   try {
     allSessionTracks = (session.sessionTracks ??
       session.tracks ??
-      []) as TrackConfiguration[]
-    console.log(
-      '[FlexibleViewUtils] Found session tracks:',
-      allSessionTracks.length,
-    )
+      []) as BaseTrackConfig[]
+    // console.log(
+    //   '[FlexibleViewUtils] Found session tracks:',
+    //   allSessionTracks.length,
+    // )
   } catch (error) {
     console.error('[FlexibleViewUtils] Error getting session tracks:', error)
     allSessionTracks = []
@@ -346,20 +409,17 @@ export function getAllTracksForAssembly(
 
   // Combine both config and session tracks
   const allTracks = [...allConfigTracks, ...allSessionTracks]
-  console.log(
-    '[FlexibleViewUtils] Total tracks (config + session):',
-    allTracks.length,
-  )
+  // console.log(
+  //   '[FlexibleViewUtils] Total tracks (config + session):',
+  //   allTracks.length,
+  // )
 
   // Filter by assembly name using proper JBrowse 2 configuration reading
-  const assemblyTracks = allTracks.filter((tc: TrackConfiguration) => {
+  const assemblyTracks = allTracks.filter((tc: BaseTrackConfig) => {
     try {
       let assemblyNames: string[] = []
       try {
-        const configAssemblyNames = readConfObject(
-          tc as JBrowseMobXTrackConfiguration,
-          ['assemblyNames'],
-        )
+        const configAssemblyNames = readConfObject(tc, ['assemblyNames'])
         if (Array.isArray(configAssemblyNames)) {
           assemblyNames = configAssemblyNames.filter(
             name => typeof name === 'string',
@@ -367,23 +427,22 @@ export function getAllTracksForAssembly(
         } else if (typeof configAssemblyNames === 'string') {
           assemblyNames = [configAssemblyNames]
         }
-        console.log(
-          `[FlexibleViewUtils] Track ${
-            readConfObject(tc as JBrowseMobXTrackConfiguration, ['trackId']) ??
-            'unknown'
-          }: readConfObject assemblyNames=`,
-          configAssemblyNames,
-          'extracted=',
-          assemblyNames,
-        )
+        // console.log(
+        //   `[FlexibleViewUtils] Track ${
+        //     readConfObject(tc as BaseTrackConfig, ['trackId']) ??
+        //     'unknown'
+        //   }: readConfObject assemblyNames=`,
+        //   configAssemblyNames,
+        //   'extracted=',
+        //   assemblyNames,
+        // )
       } catch (readConfError) {
         // Fallback to direct property access for non-MobX objects
         console.log(
           '[FlexibleViewUtils] readConfObject failed, trying direct access:',
           readConfError,
         )
-        const directAssemblyNames =
-          tc.assemblyNames ?? tc.configuration?.assemblyNames
+        const directAssemblyNames = tc.configuration?.assemblyNames
         if (Array.isArray(directAssemblyNames)) {
           assemblyNames = directAssemblyNames.filter(
             name => typeof name === 'string',
@@ -391,23 +450,23 @@ export function getAllTracksForAssembly(
         } else if (typeof directAssemblyNames === 'string') {
           assemblyNames = [directAssemblyNames]
         }
-        console.log(
-          `[FlexibleViewUtils] Track ${
-            tc.trackId ?? 'unknown'
-          }: direct access assemblyNames=`,
-          directAssemblyNames,
-          'extracted=',
-          assemblyNames,
-        )
+        // console.log(
+        //   `[FlexibleViewUtils] Track ${
+        //     tc.trackId ?? 'unknown'
+        //   }: direct access assemblyNames=`,
+        //   directAssemblyNames,
+        //   'extracted=',
+        //   assemblyNames,
+        // )
       }
 
       const matchesAssembly = assemblyNames.includes(requestedAssemblyName)
 
-      console.log(
-        `[FlexibleViewUtils] Track final check: assemblyNames=${assemblyNames.join(
-          ', ',
-        )}, requestedAssemblyName=${requestedAssemblyName}, matches=${matchesAssembly}`,
-      )
+      // console.log(
+      //   `[FlexibleViewUtils] Track final check: assemblyNames=${assemblyNames.join(
+      //     ', ',
+      //   )}, requestedAssemblyName=${requestedAssemblyName}, matches=${matchesAssembly}`,
+      // )
 
       return matchesAssembly
     } catch (error) {
@@ -419,17 +478,17 @@ export function getAllTracksForAssembly(
     }
   })
 
-  console.log(
-    '[FlexibleViewUtils] getAllTracksForAssembly result:',
-    assemblyTracks.length,
-    'tracks for assembly',
-    requestedAssemblyName,
-  )
+  // console.log(
+  //   '[FlexibleViewUtils] getAllTracksForAssembly result:',
+  //   assemblyTracks.length,
+  //   'tracks for assembly',
+  //   requestedAssemblyName,
+  // )
   return assemblyTracks
 }
 
 // Normalize/resolves basic track info for UI dropdowns
-export function extractTrackInfo(trackConf: TrackConfiguration): TrackInfo {
+export function extractTrackInfo(trackConf: BaseTrackConfig): TrackInfo {
   try {
     let trackId = ''
     let name = ''
@@ -437,11 +496,7 @@ export function extractTrackInfo(trackConf: TrackConfiguration): TrackInfo {
 
     // Extract trackId using readConfObject first, then fallback
     try {
-      trackId = String(
-        readConfObject(trackConf as JBrowseMobXTrackConfiguration, [
-          'trackId',
-        ]) ?? '',
-      )
+      trackId = String(readConfObject(trackConf, ['trackId']) ?? '')
     } catch {
       trackId = String(
         trackConf.trackId ?? trackConf.configuration?.trackId ?? '',
@@ -450,10 +505,7 @@ export function extractTrackInfo(trackConf: TrackConfiguration): TrackInfo {
 
     // Extract name using readConfObject first, then fallback
     try {
-      const configName = readConfObject(
-        trackConf as JBrowseMobXTrackConfiguration,
-        ['name'],
-      )
+      const configName = readConfObject(trackConf, ['name'])
       // Check if we got a ConfigSlot reference (contains '@' and 'ConfigSlot')
       if (
         typeof configName === 'string' &&
@@ -480,10 +532,7 @@ export function extractTrackInfo(trackConf: TrackConfiguration): TrackInfo {
 
     // Extract adapter configuration
     try {
-      adapterConfig = readConfObject(
-        trackConf as JBrowseMobXTrackConfiguration,
-        ['adapter'],
-      )
+      adapterConfig = readConfObject(trackConf, ['adapter'])
     } catch {
       adapterConfig = trackConf.adapter ?? trackConf.configuration?.adapter
     }
@@ -494,13 +543,13 @@ export function extractTrackInfo(trackConf: TrackConfiguration): TrackInfo {
       typeof adapterType === 'string' &&
       COMPATIBLE_ADAPTER_TYPES.includes(adapterType)
 
-    console.log('[FlexibleViewUtils] extractTrackInfo result:', {
-      trackId,
-      name,
-      adapterType,
-      hasIndex,
-      isCompatible,
-    })
+    // console.log('[FlexibleViewUtils] extractTrackInfo result:', {
+    //   trackId,
+    //   name,
+    //   adapterType,
+    //   hasIndex,
+    //   isCompatible,
+    // })
 
     return {
       trackId,
@@ -559,9 +608,7 @@ export const searchFeatureRangeQueries = (
         self.searchInProgress = true
       if (typeof self.isSearching !== 'undefined') self.isSearching = true
 
-      const session = getSession(
-        self as Parameters<typeof getSession>[0],
-      ) as SessionLike
+      const session = getSession(self as Parameters<typeof getSession>[0])
 
       const assembly = yield session.assemblyManager.waitForAssembly(
         self.selectedAssemblyId,
@@ -577,9 +624,8 @@ export const searchFeatureRangeQueries = (
         return []
       }
 
-      // get reactive track configuration (prefer config track)
       // Get all track configurations using proven working pattern from AGENT.md
-      const trackConfs = getTrackConfigurations(session)
+      const trackConfs = getBaseTrackConfigs(session)
       console.log(
         '🔍 DEBUG: All available tracks:',
         trackConfs.map(tc => ({
@@ -588,13 +634,11 @@ export const searchFeatureRangeQueries = (
           isMobX: 'setSubschema' in tc,
         })),
       )
-      const trackConf = trackConfs.find((tc: TrackConfiguration) => {
+      const trackConf = trackConfs.find((tc: BaseTrackConfig) => {
         try {
           let trackId: string | undefined
           if ('setSubschema' in tc && typeof tc.setSubschema === 'function') {
-            trackId = readConfObject(tc as JBrowseMobXTrackConfiguration, [
-              'trackId',
-            ])
+            trackId = readConfObject(tc, ['trackId'])
           } else {
             trackId = tc.trackId ?? tc.configuration?.trackId
           }
@@ -620,10 +664,7 @@ export const searchFeatureRangeQueries = (
         ) {
           // TypeScript now knows this is a MobX object - safe to use readConfObject
           try {
-            adapter = readConfObject(
-              trackConf as JBrowseMobXTrackConfiguration,
-              ['adapter'],
-            )
+            adapter = readConfObject(trackConf, ['adapter'])
             console.log('🔍 DEBUG: Got adapter via readConfObject')
           } catch (e) {
             console.warn(
@@ -650,7 +691,7 @@ export const searchFeatureRangeQueries = (
       // console.log('🔍 DEBUG: Using valid adapter:', adapter)
 
       const adapterType = (adapter as AdapterConfiguration).type
-      console.log('🔍 DEBUG: Starting search with adapter type:', adapterType)
+      // console.log('🔍 DEBUG: Starting search with adapter type:', adapterType)
 
       const rpcManager = session.rpcManager
       const sessionId = session.id ?? ''
@@ -693,9 +734,9 @@ export const searchFeatureRangeQueries = (
               : []
 
             if (features.length > 0) {
-              console.log(
-                `🔍 DEBUG: RPC returned ${features.length} features for region ${refName}:${start}-${end}`,
-              )
+              // console.log(
+              //   `🔍 DEBUG: RPC returned ${features.length} features for region ${refName}:${start}-${end}`,
+              // )
             }
 
             // Log first few features for debugging
@@ -705,9 +746,9 @@ export const searchFeatureRangeQueries = (
                   f.get?.('ID') || f.get?.('Name') || f.id?.() || 'no-id'
                 const name = f.get?.('Name') || f.get?.('ID') || 'no-name'
                 const type = f.get?.('type') || 'no-type'
-                console.log(
-                  `🔍 DEBUG: Processed feature ${i}: id="${id}", name="${name}", type="${type}"`,
-                )
+                // console.log(
+                //   `🔍 DEBUG: Processed feature ${i}: id="${id}", name="${name}", type="${type}"`,
+                // )
               })
             }
 
@@ -751,18 +792,18 @@ export const searchFeatureRangeQueries = (
                   dataGeneVal.toLowerCase().includes(lower)
 
                 if (matches) {
-                  console.log(
-                    `🔍 DEBUG: MATCH found - searchTerm="${searchTerm}"`,
-                    {
-                      id: idVal,
-                      name: nameVal,
-                      type: typeVal,
-                      gene_name: geneNameVal,
-                      locus_tag: locusTagVal,
-                      data_name: dataNameVal,
-                      data_gene: dataGeneVal,
-                    },
-                  )
+                  // console.log(
+                  //   `🔍 DEBUG: MATCH found - searchTerm="${searchTerm}"`,
+                  //   {
+                  //     id: idVal,
+                  //     name: nameVal,
+                  //     type: typeVal,
+                  //     gene_name: geneNameVal,
+                  //     locus_tag: locusTagVal,
+                  //     data_name: dataNameVal,
+                  //     data_gene: dataGeneVal,
+                  //   },
+                  // )
                 }
                 return matches
               } catch (e) {
@@ -772,9 +813,9 @@ export const searchFeatureRangeQueries = (
             })
 
             if (features.length > 0) {
-              console.log(
-                `🔍 DEBUG: Filtered ${filtered.length} matching features from ${features.length} total`,
-              )
+              // console.log(
+              //   `🔍 DEBUG: Filtered ${filtered.length} matching features from ${features.length} total`,
+              // )
             }
 
             const mapped = filtered
@@ -829,7 +870,7 @@ export const searchFeatureRangeQueries = (
 
       return allResults.slice(0, FEATURE_SEARCH_MAX_RESULTS)
     } catch (error) {
-      console.log(error)
+      // console.log(error)
       if (typeof self.searchResults !== 'undefined') {
         try {
           self.searchResults = []
@@ -880,172 +921,33 @@ export const searchFeatureTextIndex = (
 
       // Direct track adapter approach to bypass TextSearchManager bug
       try {
-        console.log('🔍 DEBUG: Starting direct adapter search')
-        console.log('🔍 DEBUG: searchTerm:', searchTerm)
-        console.log('🔍 DEBUG: selectedTrackId:', self.selectedTrackId)
+        // Use the centralized search function
+        const trackConfs = getBaseTrackConfigs(session)
+        const trackConf = findTrackById(trackConfs, self.selectedTrackId)
 
-        // Get track configuration directly
-        const jbrowse = session.jbrowse || (session as any).rootModel?.jbrowse
-        if (jbrowse && jbrowse.tracks) {
-          const trackConf = jbrowse.tracks.find(
-            (t: any) => t.trackId === self.selectedTrackId,
+        if (trackConf) {
+          matches = yield searchTrackFeatures(
+            session,
+            trackConf,
+            searchTerm,
+            FEATURE_SEARCH_MAX_RESULTS,
           )
-          console.log('🔍 DEBUG: Found track config:', !!trackConf)
-
-          if (trackConf?.textSearching?.textSearchAdapter) {
-            const textSearchAdapter = trackConf.textSearching.textSearchAdapter
-            console.log(
-              '🔍 DEBUG: Track has textSearchAdapter:',
-              textSearchAdapter.type,
-            )
-            console.log(
-              '🔍 DEBUG: TextSearchAdapter ID:',
-              textSearchAdapter.textSearchAdapterId,
-            )
-            console.log(
-              '🔍 DEBUG: ixxFilePath:',
-              textSearchAdapter.ixxFilePath?.uri,
-            )
-
-            // Try to instantiate and use the adapter directly
-            try {
-              const adapterClass = session.pluginManager.getAdapterType(
-                textSearchAdapter.type,
-              )
-              if (adapterClass) {
-                const adapter = new adapterClass.AdapterClass(textSearchAdapter)
-
-                const searchResults = yield adapter.searchIndex({
-                  queryString: searchTerm,
-                  searchType: 'prefix',
-                  limit: FEATURE_SEARCH_MAX_RESULTS,
-                })
-
-                console.log(
-                  '🔍 DEBUG: Direct adapter search results:',
-                  searchResults.length,
-                )
-
-                matches = searchResults
-                  .map((result: any) => {
-                    const location =
-                      result.getLocation?.() || result.location || ''
-                    const locParts = location.match(/^(.+):(\d+)-(\d+)$/)
-
-                    if (locParts) {
-                      return {
-                        refName: locParts[1],
-                        start: parseInt(locParts[2], 10),
-                        end: parseInt(locParts[3], 10),
-                      }
-                    }
-
-                    return {
-                      refName: location.split(':') || 'unknown',
-                      start: 0,
-                      end: 1,
-                    }
-                  })
-                  .filter(match => match.refName !== 'unknown')
-              } else {
-                console.log(
-                  '🔍 DEBUG: Could not get adapter class for:',
-                  textSearchAdapter.type,
-                )
-              }
-            } catch (directAdapterError) {
-              console.log(
-                '🔍 DEBUG: Direct adapter approach failed:',
-                directAdapterError,
-              )
-            }
-          }
         }
-
-        // Fallback to aggregate search if no direct results
-        if (matches.length === 0) {
-          console.log(
-            '🔍 DEBUG: Trying aggregate search with correct port handling',
-          )
-
-          const textSearchManager = session.textSearchManager
-          if (
-            textSearchManager &&
-            typeof textSearchManager.search2 === 'function'
-          ) {
-            try {
-              const aggregateResults = yield textSearchManager.search2({
-                args: {
-                  queryString: searchTerm,
-                  searchType: 'prefix' as const,
-                  limit: FEATURE_SEARCH_MAX_RESULTS,
-                },
-                searchScope: {
-                  includeAggregateIndexes: true,
-                  assemblyName: self.selectedAssemblyId,
-                },
-                rankFn: (results: any[]) => {
-                  return results.sort(
-                    (a, b) => (b.getScore?.() || 0) - (a.getScore?.() || 0),
-                  )
-                },
-              })
-
-              console.log(
-                '🔍 DEBUG: Aggregate search results:',
-                aggregateResults.length,
-              )
-
-              matches = aggregateResults
-                .filter((result: any) => {
-                  const trackId = result.getTrackId?.()
-                  return !trackId || trackId === self.selectedTrackId
-                })
-                .map((result: any) => {
-                  const location = result.getLocation?.() || ''
-                  const locParts = location.match(/^(.+):(\d+)-(\d+)$/)
-
-                  if (locParts) {
-                    return {
-                      refName: locParts[1],
-                      start: parseInt(locParts[2], 10),
-                      end: parseInt(locParts[3], 10),
-                    }
-                  }
-
-                  return {
-                    refName: location.split(':') || 'unknown',
-                    start: 0,
-                    end: 1,
-                  }
-                })
-                .filter(match => match.refName !== 'unknown')
-            } catch (aggregateError) {
-              console.log('🔍 DEBUG: Aggregate search failed:', aggregateError)
-            }
-          }
-        }
-
-        console.log(
-          '🔍 DEBUG: Final matches from direct approach:',
-          matches.length,
-        )
       } catch (error) {
-        console.log('🔍 DEBUG: Direct adapter approach failed:', error)
+        console.warn('🔍 DEBUG: Direct adapter approach failed:', error)
         matches = []
       }
-
       // Use RPC fallback if no matches from textIndexSearch
       if (matches.length === 0) {
-        console.log(
-          '🔍 DEBUG: No matches from textIndexSearch, falling back to RPC search',
-        )
+        // console.log(
+        //   '🔍 DEBUG: No matches from textIndexSearch, falling back to RPC search',
+        // )
         const fallback = searchFeatureRangeQueries(contentExtractor)
         return yield fallback.call(this, self)
       }
 
       // Process matches to fetch full feature details using RPC
-      const trackConfs = getTrackConfigurations(session)
+      const trackConfs = getBaseTrackConfigs(session)
       const trackConf = findTrackById(trackConfs, self.selectedTrackId)
       if (!trackConf) {
         console.warn(
@@ -1068,11 +970,11 @@ export const searchFeatureTextIndex = (
       const sessionId = session.id ?? ''
       let allResults: SearchResult[] = []
 
-      console.log(
-        '🔍 DEBUG: Processing',
-        matches.length,
-        'matches from textIndexSearch',
-      )
+      // console.log(
+      //   '🔍 DEBUG: Processing',
+      //   matches.length,
+      //   'matches from textIndexSearch',
+      // )
 
       for (const m of matches) {
         if (allResults.length >= FEATURE_SEARCH_MAX_RESULTS) break
@@ -1089,13 +991,13 @@ export const searchFeatureTextIndex = (
           )
 
           if (!refName) {
-            console.log('🔍 DEBUG: Skipping match - no refName')
+            // console.log('🔍 DEBUG: Skipping match - no refName')
             continue
           }
 
-          console.log(
-            `🔍 DEBUG: Processing match at ${refName}:${start}-${end}`,
-          )
+          // console.log(
+          //   `🔍 DEBUG: Processing match at ${refName}:${start}-${end}`,
+          // )
 
           queryRegion = {
             refName,
@@ -1105,10 +1007,10 @@ export const searchFeatureTextIndex = (
           }
 
           if (!adapter || typeof adapter !== 'object' || !('type' in adapter)) {
-            console.warn(
-              '🔍 DEBUG: Invalid adapter, skipping match. Adapter:',
-              adapter,
-            )
+            // console.warn(
+            //   '🔍 DEBUG: Invalid adapter, skipping match. Adapter:',
+            //   adapter,
+            // )
             continue
           }
 

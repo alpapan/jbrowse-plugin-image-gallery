@@ -45,43 +45,43 @@ export const SearchableViewMixinProperties = {
 export const SearchableViewMixin = (self: any) => ({
   views: {
     get availableAssemblies() {
-      console.log('DEBUG: availableAssemblies getter called')
+      // console.log('DEBUG: availableAssemblies getter called')
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const session = getSession(self)
         const assemblyManager = session.assemblyManager
-        console.log('DEBUG: assemblyManager:', assemblyManager)
+        // console.log('DEBUG: assemblyManager:', assemblyManager)
         const assemblyNames = assemblyManager?.assemblyNamesList || []
-        console.log('DEBUG: assemblyNames:', assemblyNames)
+        // console.log('DEBUG: assemblyNames:', assemblyNames)
 
         const assemblies = assemblyNames.map((name: string) => ({
           name,
           displayName: getAssemblyDisplayName({ name }),
         }))
-        console.log('DEBUG: formatted assemblies:', assemblies)
+        // console.log('DEBUG: formatted assemblies:', assemblies)
         return assemblies
       } catch (error) {
-        console.error('DEBUG: Error in availableAssemblies getter:', error)
+        // console.error('DEBUG: Error in availableAssemblies getter:', error)
         return []
       }
     },
 
     get availableTracks() {
-      console.log(
-        'DEBUG: availableTracks getter called, selectedAssemblyId:',
-        self.selectedAssemblyId,
-      )
+      // console.log(
+      //   'DEBUG: availableTracks getter called, selectedAssemblyId:',
+      //   self.selectedAssemblyId,
+      // )
       if (!self.selectedAssemblyId) {
         return []
       }
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const tracks = getAllTracksForAssembly(self, self.selectedAssemblyId)
-        console.log(
-          'DEBUG: availableTracks result:',
-          tracks?.length || 0,
-          'tracks',
-        )
+        // console.log(
+        //   'DEBUG: availableTracks result:',
+        //   tracks?.length || 0,
+        //   'tracks',
+        // )
         return tracks.map(extractTrackInfo)
       } catch (error) {
         console.error('DEBUG: Error in availableTracks getter:', error)
@@ -177,7 +177,7 @@ export const SearchableViewMixin = (self: any) => ({
   actions: {
     // Method names that components expect
     setSelectedAssembly(assemblyId: string) {
-      console.log('DEBUG: setSelectedAssembly called with:', assemblyId)
+      // console.log('DEBUG: setSelectedAssembly called with:', assemblyId)
       self.selectedAssemblyId = assemblyId
       self.selectedTrackId = undefined
       self.searchResults.clear()
@@ -186,7 +186,7 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     setSelectedTrack(trackId: string) {
-      console.log('DEBUG: setSelectedTrack called with:', trackId)
+      // console.log('DEBUG: setSelectedTrack called with:', trackId)
       self.selectedTrackId = trackId
       self.searchResults.clear()
       self.selectedFeatureId = undefined
@@ -194,12 +194,12 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     setSearchTerm(searchTerm: string) {
-      console.log('DEBUG: setSearchTerm called with:', searchTerm)
+      // console.log('DEBUG: setSearchTerm called with:', searchTerm)
       self.searchTerm = searchTerm
     },
 
     clearSearch() {
-      console.log('DEBUG: clearSearch called')
+      // console.log('DEBUG: clearSearch called')
       self.searchTerm = ''
       self.searchResults.clear()
       self.selectedFeatureId = undefined
@@ -207,19 +207,19 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     selectFeature(featureId: string, featureType: string) {
-      console.log('DEBUG: selectFeature called with:', featureId, featureType)
+      // console.log('DEBUG: selectFeature called with:', featureId, featureType)
       self.selectedFeatureId = featureId
       self.selectedFeatureType = featureType
     },
 
     clearFeatureSelection() {
-      console.log('DEBUG: clearFeatureSelection called')
+      // console.log('DEBUG: clearFeatureSelection called')
       self.selectedFeatureId = undefined
       self.selectedFeatureType = 'GENE'
     },
 
     clearSelections() {
-      console.log('DEBUG: clearSelections called')
+      // console.log('DEBUG: clearSelections called')
       self.selectedAssemblyId = undefined
       self.selectedTrackId = undefined
       self.searchTerm = ''
@@ -239,9 +239,9 @@ export const SearchableViewMixin = (self: any) => ({
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const results = yield searchFeatureTextIndex()(self)
 
-        if (results?.length > 0) {
-          console.log('DEBUG: searchFeatures results:', results?.length || 0)
-        }
+        // if (results?.length > 0) {
+        //   console.log('DEBUG: searchFeatures results:', results?.length || 0)
+        // }
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         self.searchResults.replace(results as SearchFeature[])
