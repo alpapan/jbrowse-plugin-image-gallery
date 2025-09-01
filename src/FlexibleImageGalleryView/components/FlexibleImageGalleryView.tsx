@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Box, Typography } from '@mui/material'
 import { observer } from 'mobx-react'
+import { isAlive } from 'mobx-state-tree'
 import ImageGalleryView from '../../SelectImageGalleryView/components/ImageGalleryView'
 import {
   AssemblySelector,
@@ -104,10 +105,13 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
       [model],
     )
 
-    // Cleanup on unmount
+    // Cleanup on unmount - safely check if model is still alive
     useEffect(() => {
       return () => {
-        model.clearSearch()
+        // Check if the MST node is still alive before calling methods
+        if (isAlive(model as unknown as Parameters<typeof isAlive>[0])) {
+          model.clearSearch()
+        }
       }
     }, [model])
 
