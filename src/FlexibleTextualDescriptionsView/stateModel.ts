@@ -1,16 +1,12 @@
-import { types, flow, getSnapshot } from 'mobx-state-tree'
+import { types, flow, isAlive } from 'mobx-state-tree'
 import { BaseViewStateModel } from '../shared/BaseViewStateModel'
 import {
   SearchableViewMixin,
   SearchableViewMixinProperties,
-  SearchFeature,
 } from '../shared/SearchableViewMixin'
 import {
-  searchFeatureRangeQueries,
   searchFeatureTextIndex,
-  getAssemblyDisplayName,
-  getFeatureId,
-  getFeatureName,
+  SearchResult,
 } from '../shared/flexibleViewUtils'
 
 const stateModel = types
@@ -96,6 +92,11 @@ const stateModel = types
 
     clearSearch() {
       // console.log('DEBUG: TextualDescriptionsView.clearSearch called')
+      // Check if the MST node is still alive before modifying state
+      if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) {
+        // console.log('DEBUG: clearSearch called on dead MST node, skipping')
+        return
+      }
       self.searchTerm = ''
       self.searchResults.clear()
       self.selectedFeatureId = undefined
@@ -148,13 +149,11 @@ const stateModel = types
     },
 
     clearSelections() {
-      // console.log('DEBUG: TextualDescriptionsView.clearSelections called')
-      self.selectedAssemblyId = undefined
-      self.selectedTrackId = undefined
-      self.searchTerm = ''
-      self.searchResults.clear()
-      self.selectedFeatureId = undefined
-      self.selectedFeatureType = 'GENE'
+      // Call the mixin's clearSelections (which has the alive check)
+      ;(self as unknown as { clearSelections: () => void }).clearSelections()
+
+      // Add view-specific textual cleanup
+      if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) return
       self.featureMarkdownUrls = undefined
       self.featureDescriptions = undefined
       self.featureContentTypes = undefined
@@ -183,7 +182,7 @@ const stateModel = types
         //   results?.length || 0,
         // )
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        self.searchResults.replace(results as SearchFeature[])
+        self.searchResults.replace(results as SearchResult[])
       } catch (e) {
         console.error('Error searching features:', e)
       } finally {

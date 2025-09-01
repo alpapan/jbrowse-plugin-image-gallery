@@ -66,8 +66,11 @@ export const BaseViewStateModel = types
     updateFeature(
       featureId: string,
       featureType: string,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _content: string,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _descriptions?: string,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _contentTypes?: string,
     ) {
       // Validate input - featureId is required, but content can be empty

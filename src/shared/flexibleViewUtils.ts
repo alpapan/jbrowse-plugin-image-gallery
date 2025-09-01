@@ -25,21 +25,6 @@ const COMPATIBLE_ADAPTER_TYPES = [
 
 // Type definitions
 
-
-// Assembly type - using the pattern from JBrowse 2 examples
-export interface AssemblyLike {
-  displayName?: string
-  name?: string
-  id?: string
-  getConf?: (key: string) => string | undefined
-  regions?: {
-    refName: string
-    start: number
-    end: number
-  }[]
-  getCanonicalRefName?: (refName: string) => string
-}
-
 // Using official JBrowse 2 configuration type
 export type AdapterConfiguration = AnyConfigurationModel
 
@@ -88,6 +73,79 @@ export interface TrackInfo {
   isCompatible: boolean
 }
 
+// Interface for view models with updateFeature and clearFeature methods
+export interface FeatureSelectableViewModel extends IBaseViewModel {
+  selectedFeatureId?: string
+  selectedFeatureType: string
+  updateFeature: (
+    featureId: string,
+    featureType: 'GENE' | 'NON_GENE',
+    content: string,
+    descriptions?: string,
+    contentTypes?: string,
+  ) => void
+  clearFeature: () => void
+  hasContent: () => boolean
+}
+
+// Specific interface for SelectImageGalleryViewModel
+export interface SelectImageGalleryViewModel extends IBaseViewModel {
+  selectedFeatureId?: string
+  selectedFeatureType: string
+  featureImages: string
+  featureLabels: string
+  featureTypes: string
+  updateFeature: (
+    featureId: string,
+    featureType: 'GENE' | 'NON_GENE',
+    images: string,
+    labels?: string,
+    types?: string,
+  ) => void
+  clearFeature: () => void
+  updateFeatureWithoutImages: (
+    featureId: string,
+    featureType: 'GENE' | 'NON_GENE',
+  ) => void
+  hasContent: () => boolean
+  deduplicatedImages: () => string[]
+  maxItems: number
+  imageSize: {
+    width: number
+    height: number
+  }
+  gff3AttributeNames: {
+    images: string
+    labels: string
+    types: string
+  }
+}
+
+// Specific interface for SelectTextualDescriptionsViewModel
+export interface SelectTextualDescriptionsViewModel extends IBaseViewModel {
+  selectedFeatureId?: string
+  selectedFeatureType: string
+  featureMarkdownUrls: string
+  featureDescriptions: string
+  featureContentTypes: string
+  updateFeature: (
+    featureId: string,
+    featureType: 'GENE' | 'NON_GENE',
+    markdownUrls: string,
+    descriptions?: string,
+    contentTypes?: string,
+  ) => void
+  clearFeature: () => void
+  hasContent: () => boolean
+  deduplicatedMarkdownUrls: () => string[]
+  maxItems: number
+  gff3AttributeNames: {
+    markdownUrls: string
+    descriptions: string
+    types: string
+  }
+}
+
 //////////////////////////////////////////////////////
 // Helper functions
 ////////////////////////////////////////////////////
@@ -95,6 +153,7 @@ export async function searchTrackFeatures(
   session: AbstractSessionModel,
   trackConf: AnyConfigurationModel,
   searchTerm: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   maxResults = 100,
 ): Promise<SearchMatch[]> {
   // Get text search adapter configuration
@@ -113,7 +172,7 @@ export async function searchTrackFeatures(
   console.warn(
     'Text search adapter access not available at runtime - functionality disabled',
   )
-  return []
+  return await Promise.resolve([])
 }
 
 function getBaseTrackConfigs(session: AbstractSessionModel): BaseTrackConfig[] {
@@ -579,14 +638,6 @@ export const searchFeatureRangeQueries = (
         return []
       }
 
-      // console.log('🔍 DEBUG: Using valid adapter:', adapter)
-
-      const adapterType = readConfObject(
-        adapter as unknown as AnyConfigurationModel,
-        'type',
-      )
-      // console.log('🔍 DEBUG: Starting search with adapter type:', adapterType)
-
       const rpcManager = session.rpcManager
       const sessionId = session.id ?? ''
       let allResults: SearchResult[] = []
@@ -634,17 +685,17 @@ export const searchFeatureRangeQueries = (
             }
 
             // Log first few features for debugging
-            if (features.length > 0) {
-              features.slice(0, 3).forEach((f, i) => {
-                const id =
-                  f.get?.('ID') || f.get?.('Name') || f.id?.() || 'no-id'
-                const name = f.get?.('Name') || f.get?.('ID') || 'no-name'
-                const type = f.get?.('type') || 'no-type'
-                // console.log(
-                //   `🔍 DEBUG: Processed feature ${i}: id="${id}", name="${name}", type="${type}"`,
-                // )
-              })
-            }
+            // if (features.length > 0) {
+            //   features.slice(0, 3).forEach(f => {
+            //     const id =
+            //       f.get?.('ID') || f.get?.('Name') || f.id?.() || 'no-id'
+            //     const name = f.get?.('Name') || f.get?.('ID') || 'no-name'
+            //     const type = f.get?.('type') || 'no-type'
+            // console.log(
+            //   `🔍 DEBUG: Processed feature ${i}: id="${id}", name="${name}", type="${type}"`,
+            // )
+            //   })
+            // }
 
             const filtered = features.filter((feature: Feature) => {
               try {

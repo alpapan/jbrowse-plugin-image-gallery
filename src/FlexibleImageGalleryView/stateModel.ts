@@ -1,12 +1,12 @@
-import { types } from 'mobx-state-tree'
+import { types, isAlive } from 'mobx-state-tree'
 import { ElementId } from '@jbrowse/core/util/types/mst'
 import { getSession } from '@jbrowse/core/util'
 import { MenuItem } from '@jbrowse/core/ui'
 import {
   SearchableViewMixin,
   SearchableViewMixinProperties,
-  SearchFeature,
 } from '../shared/SearchableViewMixin'
+import { SearchResult } from '../shared/flexibleViewUtils'
 
 const stateModel = types
   .model('FlexibleImageGalleryView', {
@@ -136,6 +136,11 @@ const stateModel = types
 
     clearSearch() {
       // console.log('DEBUG: ImageGalleryView.clearSearch called')
+      // Check if the MST node is still alive before modifying state
+      if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) {
+        // console.log('DEBUG: clearSearch called on dead MST node, skipping')
+        return
+      }
       self.searchTerm = ''
       self.searchResults.clear()
       self.selectedFeatureId = undefined
@@ -189,16 +194,16 @@ const stateModel = types
       if (featureId) {
         // Find the feature in search results to get its image data
         const feature = self.searchResults.find(
-          (f: SearchFeature) => f.id === featureId,
+          (f: SearchResult) => f.id === featureId,
         )
         if (feature) {
           // Call the method within the same actions scope (no self prefix)
           this.setSelectedFeature(
-            feature.id,
+            String(feature.id),
             feature.type === 'gene' ? 'GENE' : 'NON_GENE',
-            feature.images,
-            feature.image_captions,
-            feature.image_group,
+            String(feature.images || ''),
+            String(feature.image_captions || ''),
+            String(feature.image_group || ''),
           )
         } else {
           this.setSelectedFeature(featureId, 'GENE')
@@ -218,13 +223,11 @@ const stateModel = types
     },
 
     clearSelections() {
-      // console.log('DEBUG: ImageGalleryView.clearSelections called')
-      self.selectedAssemblyId = undefined
-      self.selectedTrackId = undefined
-      self.searchTerm = ''
-      self.searchResults.clear()
-      self.selectedFeatureId = undefined
-      self.selectedFeatureType = 'GENE'
+      // Call the mixin's clearSelections (which has the alive check)
+      ;(self as unknown as { clearSelections: () => void }).clearSelections()
+
+      // Add view-specific image cleanup
+      if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) return
       self.featureImages = undefined
       self.featureLabels = undefined
       self.featureTypes = undefined
@@ -241,7 +244,9 @@ const stateModel = types
     searchFeatures() {
       // console.log('DEBUG: ImageGalleryView.searchFeatures called')
       // Delegate to mixin search functionality
-      return (self as any).searchFeatures()
+      return (
+        self as typeof self & { searchFeatures: () => Promise<void> }
+      ).searchFeatures()
     },
   }))
   .views(self => ({

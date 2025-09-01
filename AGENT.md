@@ -1,10 +1,12 @@
 # JBrowse 2 Best Practices for AI
 
+JBrowse 2 or JBrowse or jb2 or simply jbrowse, is a React client-based visualisation toolkit for genomics. Highly modular, it extends functionality through plugins.
 This document outlines the correct way to interact with the JBrowse 2 API, intended for an AI agent. It covers core concepts, configuration, and data access patterns.
 
 **Related Documentation:**
 - [JBROWSE_PLUGIN_TEMPLATE_USAGE.md](JBROWSE_PLUGIN_TEMPLATE_USAGE.md) - Plugin template usage guide
 - [JBROWSE_TYPES.md](JBROWSE_TYPES.md) - Comprehensive type definitions reference
+- [JBROWSE_PLUGIN_TEMPLATE_USAGE.md](JBROWSE_PLUGIN_TEMPLATE_USAGE.md) - How to create a new JBrowse2 Plugin
 
 You can also parse the definition files in @/node_modules/@jbrowse/core/
 

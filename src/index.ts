@@ -2,18 +2,18 @@ import Plugin from '@jbrowse/core/Plugin'
 import PluginManager from '@jbrowse/core/PluginManager'
 import ViewType from '@jbrowse/core/pluggableElementTypes/ViewType'
 import { AbstractSessionModel, isAbstractMenuManager } from '@jbrowse/core/util'
-import { AbstractRootModel } from '@jbrowse/core/util/types'
 import { Feature } from '@jbrowse/core/util/simpleFeature'
-import { IBaseViewModel } from '@jbrowse/core/pluggableElementTypes/models/BaseViewModel'
 import { autorun } from 'mobx'
 import { version } from '../package.json'
 import {
   ReactComponent as SelectImageGalleryViewReactComponent,
   stateModel as selectImageGalleryViewStateModel,
+  SelectImageGalleryViewModel,
 } from './SelectImageGalleryView'
 import {
   ReactComponent as SelectTextualDescriptionsViewReactComponent,
   stateModel as selectTextualDescriptionsViewStateModel,
+  SelectTextualDescriptionsViewModel,
 } from './SelectTextualDescriptionsView'
 import {
   ReactComponent as FlexibleTextualDescriptionsViewReactComponent,
@@ -258,7 +258,7 @@ export default class RichAnnotationsPlugin extends Plugin {
         ? (session.views.find(
             view =>
               view.type === 'SelectImageGalleryView' && view.id === viewId,
-          ) as IBaseViewModel)
+          ) as SelectImageGalleryViewModel)
         : null
 
       // Only update existing views, don't create new ones
@@ -315,7 +315,7 @@ export default class RichAnnotationsPlugin extends Plugin {
         ? (session.views.find(
             view =>
               view.type === 'SelectImageGalleryView' && view.id === viewId,
-          ) as IBaseViewModel)
+          ) as SelectImageGalleryViewModel)
         : null
 
       // Only update existing views, don't create new ones for features without images
@@ -361,7 +361,7 @@ export default class RichAnnotationsPlugin extends Plugin {
             view =>
               view.type === 'SelectTextualDescriptionsView' &&
               view.id === viewId,
-          ) as IBaseViewModel)
+          ) as SelectTextualDescriptionsViewModel)
         : null
 
       // Only update existing views, don't create new ones
@@ -413,7 +413,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       if (session?.views) {
         const selectImageGalleryView = session.views.find(
           view => view.type === 'SelectImageGalleryView' && view.id === viewId,
-        ) as IBaseViewModel
+        ) as SelectImageGalleryViewModel
         // Atomic clear: Only clear if view exists and has clearFeature method
         if (selectImageGalleryView?.clearFeature) {
           // Reset last selected feature to ensure clean state
@@ -437,7 +437,7 @@ export default class RichAnnotationsPlugin extends Plugin {
         const selectTextualDescriptionsView = session.views.find(
           view =>
             view.type === 'SelectTextualDescriptionsView' && view.id === viewId,
-        ) as IBaseViewModel
+        ) as SelectTextualDescriptionsViewModel
         if (selectTextualDescriptionsView?.clearFeature) {
           selectTextualDescriptionsView.clearFeature()
         }
@@ -562,7 +562,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       if (feature.get && typeof feature.get === 'function') {
         // Try to get subfeatures - JBrowse features might have children/subfeatures
         const subfeatures =
-          feature.get('subfeatures') || feature.get('children') || []
+          feature.get('subfeatures') ?? feature.get('children') ?? []
         if (Array.isArray(subfeatures)) {
           subfeatures.forEach((subfeature: Feature) => {
             extractTextualData(subfeature)
@@ -703,7 +703,7 @@ export default class RichAnnotationsPlugin extends Plugin {
       if (feature.get && typeof feature.get === 'function') {
         // Try to get subfeatures - JBrowse features might have children/subfeatures
         const subfeatures =
-          feature.get('subfeatures') || feature.get('children') || []
+          feature.get('subfeatures') ?? feature.get('children') ?? []
         if (Array.isArray(subfeatures)) {
           subfeatures.forEach((subfeature: Feature) => {
             extractImageData(subfeature)
