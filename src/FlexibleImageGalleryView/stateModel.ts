@@ -1,7 +1,5 @@
 import { types, isAlive } from 'mobx-state-tree'
-import { ElementId } from '@jbrowse/core/util/types/mst'
-import { getSession } from '@jbrowse/core/util'
-import { MenuItem } from '@jbrowse/core/ui'
+import { BaseViewStateModel } from '../shared/BaseViewStateModel'
 import {
   SearchableViewMixin,
   SearchableViewMixinProperties,
@@ -9,61 +7,28 @@ import {
 import { SearchResult } from '../shared/flexibleViewUtils'
 
 const stateModel = types
-  .model('FlexibleImageGalleryView', {
-    // Core properties from BaseViewStateModel that we need
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    id: ElementId as any,
-    displayName: types.optional(types.string, ''),
-    minimized: types.optional(types.boolean, false),
-    width: types.optional(types.number, 400),
-    selectedFeatureId: types.maybe(types.string),
-    selectedFeatureType: types.optional(types.string, 'GENE'),
+  .compose(
+    'FlexibleImageGalleryView',
+    BaseViewStateModel,
+    types.model({
+      // View-specific properties only (BaseViewStateModel provides core properties)
+      type: types.literal('FlexibleImageGalleryView'),
+      imageUrls: types.maybe(types.string),
+      imageTitles: types.maybe(types.string),
+      imageDescriptions: types.maybe(types.string),
+      isLoadingTracks: types.optional(types.boolean, false),
+      isLoadingFeatures: types.optional(types.boolean, false),
 
-    // View-specific properties
-    type: types.literal('FlexibleImageGalleryView'),
-    imageUrls: types.maybe(types.string),
-    imageTitles: types.maybe(types.string),
-    imageDescriptions: types.maybe(types.string),
-    isLoadingTracks: types.optional(types.boolean, false),
-    isLoadingFeatures: types.optional(types.boolean, false),
+      // Image-specific properties
+      featureImages: types.maybe(types.string),
+      featureLabels: types.maybe(types.string),
+      featureTypes: types.maybe(types.string),
 
-    // Image-specific properties
-    featureImages: types.maybe(types.string),
-    featureLabels: types.maybe(types.string),
-    featureTypes: types.maybe(types.string),
-
-    // Mixin properties
-    ...SearchableViewMixinProperties,
-  })
+      // Mixin properties
+      ...SearchableViewMixinProperties,
+    }),
+  )
   .actions(self => ({
-    // Essential actions from BaseViewStateModel that React components expect
-    setWidth(newWidth: number) {
-      self.width = newWidth
-    },
-
-    setDisplayName(name: string) {
-      self.displayName = name
-    },
-
-    setMinimized(flag: boolean) {
-      self.minimized = flag
-    },
-
-    closeView() {
-      try {
-        const session = getSession(self)
-        if (session?.removeView) {
-          // Use TypeScript-suggested unknown conversion for type safety
-          session.removeView(
-            self as unknown as Parameters<typeof session.removeView>[0],
-          )
-        }
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Error closing view:', error)
-      }
-    },
-
     updateFeature(
       featureId: string,
       featureType: string,
@@ -102,59 +67,12 @@ const stateModel = types
       self.featureTypes = undefined
     },
 
-    // Implement component-expected methods directly
-    setSelectedAssembly(assemblyId: string) {
+    setSearchTerm(searchTerm: string) {
       // console.log(
-      //   'DEBUG: ImageGalleryView.setSelectedAssembly called with:',
-      //   assemblyId,
-      // )
-      self.selectedAssemblyId = assemblyId
-      self.selectedTrackId = undefined
-      self.searchResults.clear()
-      self.selectedFeatureId = undefined
-      self.selectedFeatureType = 'GENE'
-    },
-
-    setSelectedTrack(trackId: string) {
-      // console.log(
-      //   'DEBUG: ImageGalleryView.setSelectedTrack called with:',
-      //   trackId,
-      // )
-      self.selectedTrackId = trackId
-      self.searchResults.clear()
-      self.selectedFeatureId = undefined
-      self.selectedFeatureType = 'GENE'
-    },
-
-    setSearchText(searchTerm: string) {
-      // console.log(
-      //   'DEBUG: ImageGalleryView.setSearchText called with:',
+      //   'DEBUG: ImageGalleryView.setSearchTerm called with:',
       //   searchTerm,
       // )
       self.searchTerm = searchTerm
-    },
-
-    clearSearch() {
-      // console.log('DEBUG: ImageGalleryView.clearSearch called')
-      // Check if the MST node is still alive before modifying state
-      if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) {
-        // console.log('DEBUG: clearSearch called on dead MST node, skipping')
-        return
-      }
-      self.searchTerm = ''
-      self.searchResults.clear()
-      self.selectedFeatureId = undefined
-      self.selectedFeatureType = 'GENE'
-    },
-
-    selectFeature(featureId: string, featureType: string) {
-      // console.log(
-      //   'DEBUG: ImageGalleryView.selectFeature called with:',
-      //   featureId,
-      //   featureType,
-      // )
-      self.selectedFeatureId = featureId
-      self.selectedFeatureType = featureType
     },
 
     setSelectedFeature(
@@ -222,17 +140,6 @@ const stateModel = types
       self.featureTypes = undefined
     },
 
-    clearSelections() {
-      // Call the mixin's clearSelections (which has the alive check)
-      ;(self as unknown as { clearSelections: () => void }).clearSelections()
-
-      // Add view-specific image cleanup
-      if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) return
-      self.featureImages = undefined
-      self.featureLabels = undefined
-      self.featureTypes = undefined
-    },
-
     setLoadingFeatures(loading: boolean) {
       // console.log(
       //   'DEBUG: ImageGalleryView.setLoadingFeatures called with:',
@@ -242,24 +149,13 @@ const stateModel = types
     },
   }))
   .views(self => ({
-    // Essential views from BaseViewStateModel that React components expect
-    menuItems(): MenuItem[] {
-      return []
-    },
-
+    // View-specific views only (BaseViewStateModel provides core views)
     get defaultDisplayName() {
       return 'Image Gallery View'
     },
 
     hasContent() {
       return !!self.featureImages
-    },
-
-    get displayTitle() {
-      const displayName = self.displayName || this.defaultDisplayName
-      return self.selectedFeatureId
-        ? String(self.selectedFeatureId)
-        : displayName
     },
 
     get canSelectFeature() {

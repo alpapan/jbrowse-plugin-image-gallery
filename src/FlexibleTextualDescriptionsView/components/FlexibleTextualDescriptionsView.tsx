@@ -3,7 +3,12 @@ import { observer } from 'mobx-react'
 import { isAlive } from 'mobx-state-tree'
 import { Box, Typography } from '@mui/material'
 import { getSession } from '@jbrowse/core/util'
-import { getConf, readConfObject } from '@jbrowse/core/configuration'
+import { readConfObject } from '@jbrowse/core/configuration'
+import {
+  getTrackId,
+  getAdapterConfig,
+  getTracksFromSession,
+} from '../../shared/configUtils'
 import { SelectTextualDescriptionsViewF } from '../../SelectTextualDescriptionsView/components/Explainers'
 import {
   AssemblySelector,
@@ -181,47 +186,39 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
       model.clearSearch()
     }
     const handleFeatureSelect = (feature: FeatureOption | null) => {
-      if (feature && feature.location) {
+      if (feature?.location) {
         // Async operation to fetch actual feature data
         const fetchFeatureData = async () => {
           try {
             // Parse location to get coordinates for fetching actual feature data
-            const locationMatch = feature.location!.match(/^(.+):(\d+)\.\.(\d+)$/)
+            const locationMatch = feature.location!.match(
+              /^(.+):(\d+)\.\.(\d+)$/,
+            )
             if (locationMatch) {
               const [, refName, startStr, endStr] = locationMatch
               const start = parseInt(startStr, 10)
               const end = parseInt(endStr, 10)
-              
+
               // Get session and fetch feature data directly using RPC
               const session = getSession(model as any)
-              const trackConfs = getConf(session.jbrowse.configuration, 'tracks') ?? []
-              const trackConf = trackConfs.find((tc: any) => {
-                // Handle both MST configs and plain objects
-                try {
-                  return getConf(tc, 'trackId') === model.selectedTrackId
-                } catch {
-                  return tc.trackId === model.selectedTrackId || tc.configuration?.trackId === model.selectedTrackId
-                }
-              })
-              
+              const trackConfs = getTracksFromSession(session)
+              const trackConf = trackConfs.find(
+                (tc: any) => getTrackId(tc) === model.selectedTrackId,
+              )
+
               if (trackConf && session.id) {
-                // Handle both MST configs and plain objects for adapter
-                let adapter
-                try {
-                  adapter = readConfObject(trackConf, ['adapter'])
-                } catch {
-                  adapter = trackConf.adapter || trackConf.configuration?.adapter
-                }
+                // Get adapter configuration using unified utility
+                const adapter = getAdapterConfig(trackConf)
                 const rpcManager = session.rpcManager
                 const sessionId = session.id
-                
+
                 const queryRegion = {
                   refName,
                   start: start - 1, // Convert to 0-based
                   end,
                   assemblyName: model.selectedAssemblyId,
                 }
-                
+
                 const featureResults = await rpcManager.call(
                   sessionId,
                   'CoreGetFeatures',
@@ -231,18 +228,48 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
                     adapterConfig: adapter,
                   },
                 )
-                
-                const features = Array.isArray(featureResults) ? featureResults : []
-                const matchingFeature = features.find((f: any) =>
-                  f.get?.('ID') === feature.id || f.get?.('Name') === feature.id
+
+                const features = Array.isArray(featureResults)
+                  ? featureResults
+                  : []
+                const matchingFeature = features.find(
+                  (f: any) => {
+                    // Use the same comprehensive ID extraction as flexibleViewUtils.ts
+                    const fId = f.get?.('ID') ??
+                               f.get?.('id') ??
+                               f.get?.('Name') ??
+                               f.get?.('name') ??
+                               f.id?.() ??
+                               ''
+                    const fName = f.get?.('Name') ??
+                                 f.get?.('name') ??
+                                 f.get?.('ID') ??
+                                 f.get?.('id') ??
+                                 'Unnamed feature'
+
+                    console.log('🎯 DEBUG: Checking feature ID/Name:', fId, fName, 'against:', feature.id)
+                    return fId === feature.id || fName === feature.id
+                  },
                 )
-                
+
                 if (matchingFeature) {
                   // Extract GFF attributes from the actual feature
-                  const markdownUrls = String(matchingFeature.get?.('markdown_urls') || matchingFeature.get?.('markdown_url') || '')
-                  const descriptions = String(matchingFeature.get?.('descriptions') || matchingFeature.get?.('description') || '')
-                  const contentTypes = String(matchingFeature.get?.('content_types') || matchingFeature.get?.('content_type') || '')
-                  
+                  const markdownUrls = String(
+                    matchingFeature.get?.('markdown_urls') ||
+                      matchingFeature.get?.('markdown_url') ||
+                      '',
+                  )
+                  const descriptions = String(
+                    matchingFeature.get?.('descriptions') ||
+                      matchingFeature.get?.('description') ||
+                      '',
+                  )
+                  const contentTypes = String(
+                    matchingFeature.get?.('content_types') ||
+                      matchingFeature.get?.('content_type') ||
+                      '',
+                  )
+
                   model.setSelectedFeature(
                     feature.id,
                     feature.type === 'gene' ? 'GENE' : 'NON_GENE',
@@ -257,7 +284,7 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
           } catch (error) {
             console.error('Error fetching feature data:', error)
           }
-          
+
           // Fallback to basic selection without content
           model.setSelectedFeature(
             feature.id,
@@ -267,7 +294,7 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
             '',
           )
         }
-        
+
         // Start async fetch but don't await it
         void fetchFeatureData()
       } else {

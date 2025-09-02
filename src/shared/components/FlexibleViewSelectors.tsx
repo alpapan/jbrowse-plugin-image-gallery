@@ -235,7 +235,7 @@ export const FeatureSearchAutocomplete: React.FC<
         open={safeFeatures.length > 0 && hasSearchTerm}
         slotProps={{
           popper: {
-            sx: { zIndex: 9999 }, // Very high z-index to ensure dropdown appears above other content
+            sx: { zIndex: 1300 }, // Standard Material-UI modal z-index
           },
         }}
         onInputChange={(_, value, reason) => {
@@ -261,6 +261,15 @@ export const FeatureSearchAutocomplete: React.FC<
           } else {
             onFeatureSelect(null)
           }
+          // Force close dropdown after selection by clearing input focus
+          setTimeout(() => {
+            const input = document.querySelector(
+              '[aria-expanded="true"]',
+            ) as HTMLElement
+            if (input) {
+              input.blur()
+            }
+          }, 100)
         }}
         options={safeFeatures}
         filterOptions={options => options}

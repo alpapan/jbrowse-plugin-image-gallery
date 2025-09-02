@@ -3,7 +3,12 @@ import { Box, Typography } from '@mui/material'
 import { observer } from 'mobx-react'
 import { isAlive } from 'mobx-state-tree'
 import { getSession } from '@jbrowse/core/util'
-import { getConf, readConfObject } from '@jbrowse/core/configuration'
+import { readConfObject } from '@jbrowse/core/configuration'
+import {
+  getTrackId,
+  getAdapterConfig,
+  getTracksFromSession,
+} from '../../shared/configUtils'
 import ImageGalleryView from '../../SelectImageGalleryView/components/ImageGalleryView'
 import {
   AssemblySelector,
@@ -15,7 +20,6 @@ import {
   ClearSelectionsButton,
   type FeatureOption,
 } from '../../shared/components/FlexibleViewSelectors'
-
 
 interface FlexibleImageGalleryViewProps {
   model: {
@@ -142,7 +146,10 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
     useEffect(() => {
       // Force component to re-render when searchResults length changes
       forceUpdate({})
-      console.log('🔄 DEBUG: ImageGallery forced re-render due to searchResults change:', model.searchResults.length)
+      console.log(
+        '🔄 DEBUG: ImageGallery forced re-render due to searchResults change:',
+        model.searchResults.length,
+      )
     }, [model.searchResults.length])
 
     const handleAssemblyChange = (assemblyId: string) => {
@@ -157,47 +164,59 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
     }
 
     const handleFeatureSelect = (feature: FeatureOption | null) => {
-      if (feature && feature.location) {
+      console.log('🎯 DEBUG: handleFeatureSelect called with:', feature)
+      if (feature?.location) {
         // Async operation to fetch actual feature data
         const fetchFeatureData = async () => {
           try {
+            console.log('🎯 DEBUG: Starting fetchFeatureData for:', feature.id)
             // Parse location to get coordinates for fetching actual feature data
-            const locationMatch = feature.location!.match(/^(.+):(\d+)\.\.(\d+)$/)
+            const locationMatch = feature.location!.match(
+              /^(.+):(\d+)\.\.(\d+)$/,
+            )
+            console.log('🎯 DEBUG: Location match result:', locationMatch)
             if (locationMatch) {
               const [, refName, startStr, endStr] = locationMatch
               const start = parseInt(startStr, 10)
               const end = parseInt(endStr, 10)
-              
+
               // Get session and fetch feature data directly using RPC
               const session = getSession(model as any)
-              const trackConfs = getConf(session.jbrowse.configuration, 'tracks') ?? []
+              console.log('🎯 DEBUG: Got session:', !!session)
+              const trackConfs = getTracksFromSession(session)
+              console.log('🎯 DEBUG: trackConfs length:', trackConfs.length)
+              console.log(
+                '🎯 DEBUG: Looking for trackId:',
+                model.selectedTrackId,
+              )
+
               const trackConf = trackConfs.find((tc: any) => {
-                // Handle both MST configs and plain objects
-                try {
-                  return getConf(tc, 'trackId') === model.selectedTrackId
-                } catch {
-                  return tc.trackId === model.selectedTrackId || tc.configuration?.trackId === model.selectedTrackId
-                }
+                const tcTrackId = getTrackId(tc)
+                console.log(
+                  '🎯 DEBUG: Comparing track IDs:',
+                  tcTrackId,
+                  'vs',
+                  model.selectedTrackId,
+                )
+                return tcTrackId === model.selectedTrackId
               })
-              
+              console.log('🎯 DEBUG: Found trackConf:', !!trackConf)
+
               if (trackConf && session.id) {
-                // Handle both MST configs and plain objects for adapter
-                let adapter
-                try {
-                  adapter = readConfObject(trackConf, ['adapter'])
-                } catch {
-                  adapter = trackConf.adapter || trackConf.configuration?.adapter
-                }
+                // Get adapter configuration using unified utility
+                const adapter = getAdapterConfig(trackConf)
+                console.log('🎯 DEBUG: Got adapter config:', !!adapter)
                 const rpcManager = session.rpcManager
                 const sessionId = session.id
-                
+
                 const queryRegion = {
                   refName,
                   start: start - 1, // Convert to 0-based
                   end,
                   assemblyName: model.selectedAssemblyId,
                 }
-                
+                console.log('🎯 DEBUG: Query region:', queryRegion)
+
                 const featureResults = await rpcManager.call(
                   sessionId,
                   'CoreGetFeatures',
@@ -207,18 +226,101 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
                     adapterConfig: adapter,
                   },
                 )
-                
-                const features = Array.isArray(featureResults) ? featureResults : []
-                const matchingFeature = features.find((f: any) =>
-                  f.get?.('ID') === feature.id || f.get?.('Name') === feature.id
+                console.log('🎯 DEBUG: RPC featureResults:', featureResults)
+
+                const features = Array.isArray(featureResults)
+                  ? featureResults
+                  : []
+                console.log('🎯 DEBUG: Features array length:', features.length)
+
+                // Debug: Log all available attributes on the first feature
+                if (features.length > 0) {
+                  const firstFeature = features[0]
+                  console.log('🎯 DEBUG: First feature object:', firstFeature)
+                  console.log('🎯 DEBUG: First feature attributes:')
+                  // Try to get all possible attributes
+                  const possibleAttrs = [
+                    'ID',
+                    'id',
+                    'Name',
+                    'name',
+                    'gene',
+                    'gene_name',
+                    'locus_tag',
+                    'product',
+                    'images',
+                    'image',
+                    'image_urls',
+                    'image_url',
+                  ]
+                  possibleAttrs.forEach(attr => {
+                    try {
+                      const value = firstFeature.get?.(attr)
+                      if (value !== undefined) {
+                        console.log(`🎯 DEBUG: ${attr}:`, value)
+                      }
+                    } catch (e) {
+                      // ignore
+                    }
+                  })
+                }
+
+                const matchingFeature = features.find((f: any) => {
+                  // Use the same comprehensive ID extraction as flexibleViewUtils.ts
+                  const fId =
+                    f.get?.('ID') ??
+                    f.get?.('id') ??
+                    f.get?.('Name') ??
+                    f.get?.('name') ??
+                    f.id?.() ??
+                    ''
+                  const fName =
+                    f.get?.('Name') ??
+                    f.get?.('name') ??
+                    f.get?.('ID') ??
+                    f.get?.('id') ??
+                    'Unnamed feature'
+
+                  console.log(
+                    '🎯 DEBUG: Checking feature ID/Name:',
+                    fId,
+                    fName,
+                    'against:',
+                    feature.id,
+                  )
+                  return fId === feature.id || fName === feature.id
+                })
+                console.log(
+                  '🎯 DEBUG: Found matching feature:',
+                  !!matchingFeature,
                 )
-                
+
                 if (matchingFeature) {
                   // Extract GFF attributes from the actual feature
-                  const images = String(matchingFeature.get?.('images') || matchingFeature.get?.('image') || '')
-                  const imageCaptions = String(matchingFeature.get?.('image_captions') || matchingFeature.get?.('image_caption') || '')
-                  const imageGroup = String(matchingFeature.get?.('image_group') || matchingFeature.get?.('image_groups') || '')
-                  
+                  const images = String(
+                    matchingFeature.get?.('images') ||
+                      matchingFeature.get?.('image') ||
+                      '',
+                  )
+                  const imageCaptions = String(
+                    matchingFeature.get?.('image_captions') ||
+                      matchingFeature.get?.('image_caption') ||
+                      '',
+                  )
+                  const imageGroup = String(
+                    matchingFeature.get?.('image_group') ||
+                      matchingFeature.get?.('image_groups') ||
+                      '',
+                  )
+                  console.log(
+                    '🎯 DEBUG: Extracted GFF attributes - images:',
+                    images,
+                    'captions:',
+                    imageCaptions,
+                    'group:',
+                    imageGroup,
+                  )
+
                   model.setSelectedFeature(
                     feature.id,
                     feature.type === 'gene' ? 'GENE' : 'NON_GENE',
@@ -226,15 +328,31 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
                     imageCaptions,
                     imageGroup,
                   )
+                  console.log(
+                    '🎯 DEBUG: Called setSelectedFeature with content',
+                  )
                   return
+                } else {
+                  console.log(
+                    '🎯 DEBUG: No matching feature found in RPC results',
+                  )
                 }
+              } else {
+                console.log(
+                  '🎯 DEBUG: Missing trackConf or session.id:',
+                  !!trackConf,
+                  !!session.id,
+                )
               }
             }
           } catch (error) {
-            console.error('Error fetching feature data:', error)
+            console.error('🎯 DEBUG: Error in fetchFeatureData:', error)
           }
-          
+
           // Fallback to basic selection without content
+          console.log(
+            '🎯 DEBUG: Falling back to basic selection without content',
+          )
           model.setSelectedFeature(
             feature.id,
             feature.type === 'gene' ? 'GENE' : 'NON_GENE',
@@ -243,10 +361,11 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
             '',
           )
         }
-        
+
         // Start async fetch but don't await it
         void fetchFeatureData()
       } else {
+        console.log('🎯 DEBUG: No feature or location, clearing selection')
         model.setSelectedFeature(undefined)
       }
     }
@@ -288,7 +407,18 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
             searchHandler(value)
           }}
           features={model.searchResults}
-          onFeatureSelect={handleFeatureSelect}
+          onFeatureSelect={feature => {
+            handleFeatureSelect(feature)
+            // Close dropdown after selection
+            setTimeout(() => {
+              const autocompleteInputs = document.querySelectorAll(
+                'input[role="combobox"]',
+              )
+              autocompleteInputs.forEach(input => {
+                ;(input as HTMLElement).blur()
+              })
+            }, 100)
+          }}
           isSearching={model.isSearching}
           canSearch={model.canSearch}
           selectedTrackId={model.selectedTrackId}
