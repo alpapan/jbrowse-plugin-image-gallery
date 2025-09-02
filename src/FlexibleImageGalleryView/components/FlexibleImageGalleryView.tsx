@@ -10,6 +10,7 @@ import {
   getTracksFromSession,
 } from '../../shared/configUtils'
 import ImageGalleryView from '../../SelectImageGalleryView/components/ImageGalleryView'
+import { SelectImageGalleryViewF } from '../../SelectImageGalleryView/components/Explainers'
 import {
   AssemblySelector,
   TrackSelector,
@@ -166,6 +167,15 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
     const handleFeatureSelect = (feature: FeatureOption | null) => {
       console.log('🎯 DEBUG: handleFeatureSelect called with:', feature)
       if (feature?.location) {
+        // Set feature immediately to show the view, then fetch data
+        model.setSelectedFeature(
+          feature.id,
+          feature.type === 'gene' ? 'GENE' : 'NON_GENE',
+          '',
+          '',
+          '',
+        )
+
         // Async operation to fetch actual feature data
         const fetchFeatureData = async () => {
           try {
@@ -321,6 +331,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
                     imageGroup,
                   )
 
+                  // Update with actual content
                   model.setSelectedFeature(
                     feature.id,
                     feature.type === 'gene' ? 'GENE' : 'NON_GENE',
@@ -407,18 +418,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
             searchHandler(value)
           }}
           features={model.searchResults}
-          onFeatureSelect={feature => {
-            handleFeatureSelect(feature)
-            // Close dropdown after selection
-            setTimeout(() => {
-              const autocompleteInputs = document.querySelectorAll(
-                'input[role="combobox"]',
-              )
-              autocompleteInputs.forEach(input => {
-                ;(input as HTMLElement).blur()
-              })
-            }, 100)
-          }}
+          onFeatureSelect={handleFeatureSelect}
           isSearching={model.isSearching}
           canSearch={model.canSearch}
           selectedTrackId={model.selectedTrackId}
@@ -439,8 +439,8 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
         {model.selectedFeatureId && model.isReady && (
           <Box sx={{ mt: 2 }}>
             {model.hasContent ? (
-              // Use the existing ImageGalleryView component for content display
-              <ImageGalleryView
+              // Use the SelectImageGalleryViewF component directly for proper formatting
+              <SelectImageGalleryViewF
                 model={{
                   hasContent: model.hasContent,
                   displayTitle: `Images for ${model.selectedFeatureId}`,
@@ -448,8 +448,6 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
                   featureLabels: model.featureLabels,
                   featureTypes: model.featureTypes,
                   selectedFeatureId: model.selectedFeatureId,
-                  minimized: false,
-                  setMinimized: () => {},
                 }}
               />
             ) : (

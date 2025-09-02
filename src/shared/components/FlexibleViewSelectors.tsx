@@ -261,15 +261,6 @@ export const FeatureSearchAutocomplete: React.FC<
           } else {
             onFeatureSelect(null)
           }
-          // Force close dropdown after selection by clearing input focus
-          setTimeout(() => {
-            const input = document.querySelector(
-              '[aria-expanded="true"]',
-            ) as HTMLElement
-            if (input) {
-              input.blur()
-            }
-          }, 100)
         }}
         options={safeFeatures}
         filterOptions={options => options}
