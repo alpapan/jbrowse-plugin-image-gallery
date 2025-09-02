@@ -156,7 +156,7 @@ export async function searchTrackFeatures(
   searchTerm: string,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   maxResults = 100,
-): Promise<SearchMatch[]> {
+): Promise<SearchResult[]> {
   try {
     // Defensive check: ensure searchTerm is never undefined
     const safeSearchTerm = (searchTerm ?? '').trim()
@@ -254,28 +254,95 @@ export async function searchTrackFeatures(
       )
       console.log('🔍 DEBUG: textSearchManager.search returned:', results)
 
-      // Convert results to SearchMatch format
-      return (results || [])
-        .map((result: unknown) => {
-          if (!result) return null
-          const r = result as Record<string, unknown>
-          return {
-            refName: String(r.refName || ''),
-            start: Number(r.start || 0),
-            end: Number(r.end || 0),
-            loc: {
-              refName: String(r.refName || ''),
-              start: Number(r.start || 0),
-              end: Number(r.end || 0),
-            },
-            location: {
-              refName: String(r.refName || ''),
-              start: Number(r.start || 0),
-              end: Number(r.end || 0),
-            },
+      // Convert BaseResult to SearchResult format directly
+      console.log(
+        '🔍 DEBUG: Converting BaseResult to SearchResult, results count:',
+        results?.length || 0,
+      )
+      const convertedResults = (results || [])
+        .map((result: unknown, index: number) => {
+          if (!result) {
+            console.log(`🔍 DEBUG: Result ${index} is null/undefined`)
+            return null
           }
+          const baseResult = result as BaseResult
+          console.log(`🔍 DEBUG: Processing BaseResult ${index}:`, {
+            hasGetLocation: !!baseResult.getLocation,
+            locString: baseResult.locString,
+            label: (baseResult as unknown as Record<string, unknown>).label,
+            name: (baseResult as unknown as Record<string, unknown>).name,
+            id: (baseResult as unknown as Record<string, unknown>).id,
+            type: (baseResult as unknown as Record<string, unknown>).type,
+          })
+
+          const location = baseResult.getLocation
+            ? baseResult.getLocation()
+            : baseResult.locString ?? ''
+
+          // Extract type from matchedObject if available
+          let extractedType = String(
+            (baseResult as unknown as Record<string, unknown>).type ??
+              'Unknown',
+          )
+          const baseResultRecord = baseResult as unknown as Record<
+            string,
+            unknown
+          >
+          if (
+            baseResultRecord.matchedObject &&
+            Array.isArray(baseResultRecord.matchedObject)
+          ) {
+            const matchedObject = baseResultRecord.matchedObject as unknown[]
+            if (matchedObject.length >= 4) {
+              const typeString = String(matchedObject[3] ?? '')
+              // Extract type from format like "gene-LOC100130531" -> "gene"
+              if (typeString.includes('-')) {
+                extractedType = typeString.split('-')[0]
+              } else {
+                extractedType = typeString
+              }
+            }
+          }
+
+          const searchResult = {
+            id: String(
+              (baseResult as unknown as Record<string, unknown>).label ||
+                (baseResult as unknown as Record<string, unknown>).name ||
+                (baseResult as unknown as Record<string, unknown>).id ||
+                '',
+            ),
+            name: String(
+              (baseResult as unknown as Record<string, unknown>).label ||
+                (baseResult as unknown as Record<string, unknown>).name ||
+                '',
+            ),
+            type: extractedType,
+            location: location,
+            locString: baseResult.locString ?? location,
+          } as SearchResult
+
+          console.log(`🔍 DEBUG: Created SearchResult ${index}:`, searchResult)
+          return searchResult
         })
-        .filter(Boolean) as SearchMatch[]
+        .filter(Boolean) as SearchResult[]
+
+      console.log(
+        '🔍 DEBUG: Final converted results count:',
+        convertedResults.length,
+      )
+
+      // Deduplicate results based on ID
+      const deduplicatedResults = convertedResults.filter(
+        (result, index, self) =>
+          index === self.findIndex(r => r.id === result.id),
+      )
+
+      console.log(
+        '🔍 DEBUG: After deduplication:',
+        deduplicatedResults.length,
+        'results',
+      )
+      return deduplicatedResults
     }
 
     // Fallback: Direct index file access (simplified implementation)
@@ -355,48 +422,6 @@ function findTrackById(
       return tc.trackId === trackId || tc.configuration?.trackId === trackId
     }
   })
-}
-
-function safeGetAdapter(trackConf: BaseTrackConfig): unknown {
-  // console.log(
-  //   '🔍 DEBUG: safeGetAdapter called with trackConf keys:',
-  //   Object.keys(trackConf),
-  // )
-
-  let adapter: unknown = undefined
-
-  // First, try direct property access
-  adapter = trackConf.adapter
-  if (adapter) {
-    // console.log('🔍 DEBUG: Found adapter via direct access:', adapter)
-  } else if (trackConf.configuration?.adapter) {
-    adapter = trackConf.configuration.adapter
-    // console.log('🔍 DEBUG: Found adapter via configuration:', adapter)
-  }
-
-  // If no direct access, try readConfObject for MobX objects
-  if (
-    !adapter &&
-    'setSubschema' in trackConf &&
-    typeof trackConf.setSubschema === 'function'
-  ) {
-    try {
-      adapter = readConfObject(trackConf, ['adapter'])
-      // console.log('🔍 DEBUG: Found adapter via readConfObject:', adapter)
-    } catch (error) {
-      // console.log('🔍 DEBUG: readConfObject failed:', error)
-    }
-  }
-
-  console.log('🔍 DEBUG: Final adapter:', adapter)
-
-  // Validate adapter
-  if (adapter && typeof adapter === 'object' && 'type' in adapter) {
-    return adapter
-  } else {
-    console.warn('🔍 DEBUG: Invalid or missing adapter configuration')
-    return undefined
-  }
 }
 
 // Friendly assembly display name helper (shared)
@@ -926,20 +951,15 @@ export const searchFeatureRangeQueries = (
         }
       }
 
-      if (typeof self.searchResults !== 'undefined') {
-        try {
-          self.searchResults = allResults.slice(0, FEATURE_SEARCH_MAX_RESULTS)
-        } catch (_e) {
-          // fallback plain assignment
-          // eslint-disable-next-line no-console
-          console.warn(
-            'commonFeatureSearch: cast failed, using plain assignment',
-          )
-          self.searchResults = allResults.slice(0, FEATURE_SEARCH_MAX_RESULTS)
-        }
-      }
+      // Deduplicate results based on ID before returning
+      const deduplicatedResults = allResults
+        .filter(
+          (result, index, self) =>
+            index === self.findIndex(r => r.id === result.id),
+        )
+        .slice(0, FEATURE_SEARCH_MAX_RESULTS)
 
-      return allResults.slice(0, FEATURE_SEARCH_MAX_RESULTS)
+      return deduplicatedResults
     } catch (error) {
       // console.log(error)
       if (typeof self.searchResults !== 'undefined') {
@@ -988,175 +1008,55 @@ export const searchFeatureTextIndex = (
       if (typeof self.isSearching !== 'undefined') self.isSearching = true
 
       const session = getSession(self)
-      let matches: SearchMatch[] = []
+      let searchResults: SearchResult[] = []
 
       // Direct track adapter approach to bypass TextSearchManager bug
       try {
+        console.log(
+          '🔍 DEBUG: searchFeatureTextIndex - starting searchTrackFeatures call',
+        )
         // Use the centralized search function
         const trackConfs = getBaseTrackConfigs(session)
         const trackConf = findTrackById(trackConfs, self.selectedTrackId)
 
         if (trackConf) {
-          matches = yield searchTrackFeatures(
+          console.log(
+            '🔍 DEBUG: searchFeatureTextIndex - found trackConf, calling searchTrackFeatures',
+          )
+          searchResults = yield searchTrackFeatures(
             session,
             trackConf,
             searchTerm,
             FEATURE_SEARCH_MAX_RESULTS,
           )
+          console.log(
+            '🔍 DEBUG: searchFeatureTextIndex - searchTrackFeatures returned:',
+            searchResults?.length || 0,
+            'results',
+          )
+        } else {
+          console.log('🔍 DEBUG: searchFeatureTextIndex - no trackConf found')
         }
       } catch (error) {
         console.warn('🔍 DEBUG: Direct adapter approach failed:', error)
-        matches = []
+        searchResults = []
       }
       // Use RPC fallback if no matches from textIndexSearch
-      if (matches.length === 0) {
+      if (searchResults.length === 0) {
         console.log(
           '🔍 DEBUG: No matches from textIndexSearch, falling back to RPC search',
         )
         const fallback = searchFeatureRangeQueries(contentExtractor)
         return yield fallback.call(this, self)
-      }
-
-      // Process matches to fetch full feature details using RPC
-      const trackConfs = getBaseTrackConfigs(session)
-      const trackConf = findTrackById(trackConfs, self.selectedTrackId)
-      if (!trackConf) {
-        console.warn(
-          '🔍 DEBUG: No track configuration found for ID:',
-          self.selectedTrackId,
+      } else {
+        console.log(
+          '🔍 DEBUG: searchFeatureTextIndex - returning results without RPC fallback',
         )
-        return []
       }
 
-      const adapter = safeGetAdapter(trackConf)
-      if (!adapter) {
-        console.warn(
-          '🔍 DEBUG: No adapter found for track:',
-          self.selectedTrackId,
-        )
-        return []
-      }
-
-      const rpcManager = session.rpcManager
-      const sessionId = session.id ?? ''
-      let allResults: SearchResult[] = []
-
-      // console.log(
-      //   '🔍 DEBUG: Processing',
-      //   matches.length,
-      //   'matches from textIndexSearch',
-      // )
-
-      for (const m of matches) {
-        if (allResults.length >= FEATURE_SEARCH_MAX_RESULTS) break
-        let queryRegion: Region | undefined
-
-        try {
-          const refName = String(
-            m.refName ?? m.ref ?? m.loc?.refName ?? m.location?.refName ?? '',
-          )
-          const start = Number(
-            m.start ?? m.loc?.start ?? m.location?.start ?? 0,
-          )
-          const end = Number(
-            m.end ?? m.loc?.end ?? m.location?.end ?? start + 1,
-          )
-
-          if (!refName) {
-            // console.log('🔍 DEBUG: Skipping match - no refName')
-            continue
-          }
-
-          // console.log(
-          //   `🔍 DEBUG: Processing match at ${refName}:${start}-${end}`,
-          // )
-
-          queryRegion = {
-            refName,
-            start: Math.max(0, start - 5),
-            end: end + 5,
-            assemblyName: self.selectedAssemblyId,
-          }
-
-          if (!adapter || typeof adapter !== 'object' || !('type' in adapter)) {
-            // console.warn(
-            //   '🔍 DEBUG: Invalid adapter, skipping match. Adapter:',
-            //   adapter,
-            // )
-            continue
-          }
-
-          const featureResults = yield rpcManager.call(
-            sessionId,
-            'CoreGetFeatures',
-            {
-              regions: [queryRegion],
-              adapterConfig: adapter,
-            },
-          )
-
-          const features = Array.isArray(featureResults)
-            ? (featureResults as Feature[])
-            : []
-
-          const mapped = features
-            .slice(0, FEATURE_SEARCH_MAX_RESULTS - allResults.length)
-            .map((feature: Feature) => {
-              const id = getFeatureId(feature)
-              const name = getFeatureName(feature)
-              const type = String(feature.get?.('type') ?? 'Unknown')
-              const startPos = String(feature.get?.('start') ?? '')
-              const endPos = String(feature.get?.('end') ?? '')
-              const location = queryRegion
-                ? `${queryRegion.refName}:${startPos}-${endPos}`
-                : 'unknown'
-              const extra = contentExtractor(feature) || {}
-              return Object.assign(
-                { id, name, type, location },
-                extra,
-              ) as SearchResult
-            })
-
-          allResults = allResults.concat(mapped)
-        } catch (rpcError) {
-          const regionInfo = queryRegion
-            ? `${queryRegion.refName}:${queryRegion.start}-${queryRegion.end}`
-            : 'unknown'
-          console.warn(
-            `🔍 DEBUG: RPC call failed for region ${regionInfo}:`,
-            rpcError,
-          )
-          continue
-        }
-      }
-
-      if (typeof self.searchResults !== 'undefined') {
-        if (self.selectedTrackId) {
-          allResults = allResults.filter(
-            result => result.trackId === self.selectedTrackId,
-          )
-        }
-
-        try {
-          self.searchResults = allResults.slice(0, FEATURE_SEARCH_MAX_RESULTS)
-        } catch (_e) {
-          console.warn(
-            'textIndexFeatureSearch: cast failed, using plain assignment',
-          )
-          self.searchResults = allResults.slice(0, FEATURE_SEARCH_MAX_RESULTS)
-        }
-      }
-
-      return allResults.slice(0, FEATURE_SEARCH_MAX_RESULTS)
+      return searchResults
     } catch (error) {
       console.error('textIndexFeatureSearch: unexpected error', error)
-      if (typeof self.searchResults !== 'undefined') {
-        try {
-          self.searchResults = []
-        } catch (_e) {
-          self.searchResults = []
-        }
-      }
       return []
     } finally {
       if (typeof self.searchInProgress !== 'undefined')

@@ -95,10 +95,13 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
 
     const searchHandler = useCallback(
       (value: string) => {
+        console.log('🔍 DEBUG: Component searchHandler called with:', value)
         model.setSearchTerm(value)
         if (value.trim()) {
+          console.log('🔍 DEBUG: Component calling model.searchFeatures()')
           model.searchFeatures()
         } else {
+          console.log('🔍 DEBUG: Component calling model.clearSearch()')
           model.clearSearch()
         }
       },

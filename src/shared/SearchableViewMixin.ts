@@ -7,6 +7,7 @@ import {
   searchFeatureTextIndex,
   SearchResult,
   TrackInfo,
+  SearchableViewModel,
 } from './flexibleViewUtils'
 
 // Define the mixin properties that need to be added to models using this mixin
@@ -22,7 +23,6 @@ export const SearchableViewMixinProperties = {
 export const SearchableViewMixin = (self: any) => ({
   views: {
     get availableAssemblies() {
-      // Debug statements removed - were used for development logging
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const session = getSession(self)
@@ -42,7 +42,6 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     get availableTracks() {
-      // Debug statements removed - were used for development logging
       if (!self.selectedAssemblyId) {
         return []
       }
@@ -62,7 +61,6 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     get selectedAssembly() {
-      // Debug statements removed - were used for development logging
       if (!self.selectedAssemblyId) {
         return undefined
       }
@@ -147,7 +145,6 @@ export const SearchableViewMixin = (self: any) => ({
   actions: {
     // Method names that components expect
     setSelectedAssembly(assemblyId: string) {
-      // Debug statements removed - were used for development logging
       self.selectedAssemblyId = assemblyId
       self.selectedTrackId = undefined
       self.searchResults.clear()
@@ -156,7 +153,6 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     setSelectedTrack(trackId: string) {
-      // Debug statements removed - were used for development logging
       self.selectedTrackId = trackId
       self.searchResults.clear()
       self.selectedFeatureId = undefined
@@ -164,13 +160,11 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     setSearchTerm(searchTerm: string) {
-      // Debug statements removed - were used for development logging
       self.searchTerm = searchTerm
     },
 
     // Base method for common clearSearch logic
     clearSearchBase() {
-      // Debug statements removed - were used for development logging
       // Check if the MST node is still alive before modifying state
       if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) {
         return
@@ -182,7 +176,6 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     clearSearch() {
-      // Debug statements removed - were used for development logging
       // Check if the MST node is still alive before calling base method
       if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) {
         return
@@ -192,20 +185,17 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     selectFeature(featureId: string, featureType: string) {
-      // Debug statements removed - were used for development logging
       self.selectedFeatureId = featureId
       self.selectedFeatureType = featureType
     },
 
     clearFeatureSelection() {
-      // Debug statements removed - were used for development logging
       self.selectedFeatureId = undefined
       self.selectedFeatureType = 'GENE'
     },
 
     // Base method for common clearSelections logic
     clearSelectionsBase() {
-      // Debug statements removed - were used for development logging
       // Check if the MST node is still alive before modifying state
       if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) {
         return
@@ -219,7 +209,6 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     clearSelections() {
-      // Debug statements removed - were used for development logging
       // Check if the MST node is still alive before calling base method
       if (!isAlive(self as unknown as Parameters<typeof isAlive>[0])) {
         return
@@ -229,18 +218,39 @@ export const SearchableViewMixin = (self: any) => ({
     },
 
     searchFeatures: flow(function* searchFeatures() {
-      // Debug statements removed - were used for development logging
       self.isSearching = true
       self.searchResults.clear()
       self.selectedFeatureId = undefined
       self.selectedFeatureType = 'GENE'
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        const results = yield searchFeatureTextIndex()(self)
+        const searchFn = searchFeatureTextIndex()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const results = yield searchFn.call(
+          undefined,
+          self as SearchableViewModel,
+        )
+
+        console.log(
+          '🔍 DEBUG: Mixin searchFeatures - results received:',
+          results?.length || 0,
+        )
+        console.log(
+          '🔍 DEBUG: Mixin searchFeatures - self.searchResults before replace:',
+          self.searchResults?.length || 0,
+        )
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         self.searchResults.replace(results as SearchResult[])
+
+        console.log(
+          '🔍 DEBUG: Mixin searchFeatures - self.searchResults after replace:',
+          self.searchResults?.length || 0,
+        )
+        console.log(
+          '🔍 DEBUG: Mixin searchFeatures - self.features getter:',
+          self.features?.length || 0,
+        )
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Error searching features:', e)

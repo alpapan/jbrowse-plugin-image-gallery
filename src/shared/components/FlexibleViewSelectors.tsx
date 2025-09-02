@@ -20,6 +20,7 @@ interface FeatureOption {
   name: string
   type: string
   location?: string
+  locString?: string
   description?: string
   // Textual specific fields
   markdown_urls?: string
@@ -217,7 +218,28 @@ export const FeatureSearchAutocomplete: React.FC<
   hasSearchTerm,
   contentType,
 }) => {
-  if (!selectedTrackId) return null
+  // Add debugging logs
+  // console.log('🔍 DEBUG: FeatureSearchAutocomplete render', {
+  //   selectedTrackId,
+  //   featuresCount: features?.length || 0,
+  //   isSearching,
+  //   canSearch,
+  //   hasSearchTerm,
+  //   searchInputValue,
+  //   featuresType: Array.isArray(features) ? 'array' : typeof features,
+  // })
+
+  // Ensure features is always an array
+  const safeFeatures = Array.isArray(features) ? features : []
+
+  // Only hide if we have no track selected AND no search results to show
+  // Allow rendering even without selectedTrackId if there are features to display
+  if (!selectedTrackId && safeFeatures.length === 0) {
+    console.log(
+      '🔍 DEBUG: FeatureSearchAutocomplete - returning null (no track and no features)',
+    )
+    return null
+  }
 
   const placeholderText =
     contentType === 'image'
@@ -243,12 +265,18 @@ export const FeatureSearchAutocomplete: React.FC<
             onFeatureSelect(null)
           }
         }}
-        options={features || []}
+        options={safeFeatures}
         getOptionLabel={option => {
           if (typeof option === 'string') return option
-          return `${option.name ?? option.id} (${option.type})`
+          // Use locString if available (from BaseResult), otherwise fallback to location
+          const displayLocation = option.locString ?? option.location ?? ''
+          return `${option.name ?? option.id} (${option.type}) ${
+            displayLocation ? `• ${displayLocation}` : ''
+          }`
         }}
         loading={isSearching}
+        open={isSearching || (safeFeatures.length > 0 && hasSearchTerm)}
+        onClose={() => {}}
         disabled={!canSearch}
         renderInput={params => (
           <TextField
@@ -268,30 +296,34 @@ export const FeatureSearchAutocomplete: React.FC<
             }}
           />
         )}
-        renderOption={(props, option) => (
-          <Box component="li" {...props}>
-            <Box>
-              <Typography variant="body2">
-                <strong>{option.name ?? option.id}</strong>
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {option.type}
-                {option.location && ` • ${option.location}`}
-              </Typography>
-              {option.description && (
-                <Typography
-                  variant="caption"
-                  display="block"
-                  color="text.secondary"
-                >
-                  {option.description.length > 100
-                    ? `${option.description.substring(0, 100)}...`
-                    : option.description}
+        renderOption={(props, option) => {
+          // Use locString if available (from BaseResult), otherwise fallback to location
+          const displayLocation = option.locString ?? option.location ?? ''
+          return (
+            <Box component="li" {...props}>
+              <Box>
+                <Typography variant="body2">
+                  <strong>{option.name ?? option.id}</strong>
                 </Typography>
-              )}
+                <Typography variant="caption" color="text.secondary">
+                  {option.type}
+                  {displayLocation && ` • ${displayLocation}`}
+                </Typography>
+                {option.description && (
+                  <Typography
+                    variant="caption"
+                    display="block"
+                    color="text.secondary"
+                  >
+                    {option.description.length > 100
+                      ? `${option.description.substring(0, 100)}...`
+                      : option.description}
+                  </Typography>
+                )}
+              </Box>
             </Box>
-          </Box>
-        )}
+          )
+        }}
         noOptionsText={
           !hasSearchTerm
             ? 'Start typing to search features...'

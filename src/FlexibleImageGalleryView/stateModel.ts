@@ -240,14 +240,6 @@ const stateModel = types
       // )
       self.isLoadingFeatures = loading
     },
-
-    searchFeatures() {
-      // console.log('DEBUG: ImageGalleryView.searchFeatures called')
-      // Delegate to mixin search functionality
-      return (
-        self as typeof self & { searchFeatures: () => Promise<void> }
-      ).searchFeatures()
-    },
   }))
   .views(self => ({
     // Essential views from BaseViewStateModel that React components expect

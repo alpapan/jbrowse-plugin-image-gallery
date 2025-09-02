@@ -1,13 +1,10 @@
-import { types, flow, isAlive } from 'mobx-state-tree'
+import { types, isAlive } from 'mobx-state-tree'
 import { BaseViewStateModel } from '../shared/BaseViewStateModel'
 import {
   SearchableViewMixin,
   SearchableViewMixinProperties,
 } from '../shared/SearchableViewMixin'
-import {
-  searchFeatureTextIndex,
-  SearchResult,
-} from '../shared/flexibleViewUtils'
+import { SearchResult } from '../shared/flexibleViewUtils'
 
 const stateModel = types
   .compose(
@@ -138,7 +135,32 @@ const stateModel = types
         self.featureContentTypes = undefined
       }
     },
-
+    selectFeatureWithTextualData(featureId: string | undefined) {
+      // console.log(
+      //   'DEBUG: TextualDescriptionsView.selectFeatureWithTextualData called with:',
+      //   featureId,
+      // )
+      if (featureId) {
+        // Find the feature in search results to get its textual data
+        const feature = self.searchResults.find(
+          (f: SearchResult) => f.id === featureId,
+        )
+        if (feature) {
+          // Call the method within the same actions scope (no self prefix)
+          this.setSelectedFeature(
+            String(feature.id),
+            feature.type === 'gene' ? 'GENE' : 'NON_GENE',
+            String(feature.markdownUrls || ''),
+            String(feature.descriptions || ''),
+            String(feature.contentTypes || ''),
+          )
+        } else {
+          this.setSelectedFeature(featureId, 'GENE')
+        }
+      } else {
+        this.setSelectedFeature(undefined)
+      }
+    },
     clearFeatureSelection() {
       // console.log('DEBUG: TextualDescriptionsView.clearFeatureSelection called')
       self.selectedFeatureId = undefined
@@ -166,29 +188,6 @@ const stateModel = types
       // )
       self.isLoadingFeatures = loading
     },
-
-    searchFeatures: flow(function* searchFeatures() {
-      // console.log('DEBUG: TextualDescriptionsView.searchFeatures called')
-      self.isSearching = true
-      self.searchResults.clear()
-      self.selectedFeatureId = undefined
-      self.selectedFeatureType = 'GENE'
-
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        const results = yield searchFeatureTextIndex()(self)
-        // console.log(
-        //   'DEBUG: TextualDescriptionsView.searchFeatures results:',
-        //   results?.length || 0,
-        // )
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        self.searchResults.replace(results as SearchResult[])
-      } catch (e) {
-        console.error('Error searching features:', e)
-      } finally {
-        self.isSearching = false
-      }
-    }),
   }))
   .extend(SearchableViewMixin)
 
