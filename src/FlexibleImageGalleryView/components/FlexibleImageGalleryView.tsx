@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Box, Typography } from '@mui/material'
 import { observer } from 'mobx-react'
 import { isAlive } from 'mobx-state-tree'
+import { getSession } from '@jbrowse/core/util'
+import { getConf, readConfObject } from '@jbrowse/core/configuration'
 import ImageGalleryView from '../../SelectImageGalleryView/components/ImageGalleryView'
 import {
   AssemblySelector,
@@ -11,19 +13,9 @@ import {
   InstructionsPanel,
   ErrorDisplay,
   ClearSelectionsButton,
+  type FeatureOption,
 } from '../../shared/components/FlexibleViewSelectors'
 
-interface FeatureOption {
-  id: string
-  name: string
-  type: string
-  location?: string
-  description?: string
-  images?: string
-  image_captions?: string
-  image_group?: string
-  image_tag?: string
-}
 
 interface FlexibleImageGalleryViewProps {
   model: {
@@ -164,19 +156,96 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
       model.clearSearch()
     }
 
-    const handleFeatureSelect = (
-      feature: {
-        id: string
-        name: string
-        type: string
-        images?: string
-        image_captions?: string
-        image_group?: string
-      } | null,
-    ) => {
-      if (feature) {
-        // Use the new action that fetches image data
-        model.selectFeatureWithImageData(feature.id)
+    const handleFeatureSelect = (feature: FeatureOption | null) => {
+      if (feature && feature.location) {
+        // Async operation to fetch actual feature data
+        const fetchFeatureData = async () => {
+          try {
+            // Parse location to get coordinates for fetching actual feature data
+            const locationMatch = feature.location!.match(/^(.+):(\d+)\.\.(\d+)$/)
+            if (locationMatch) {
+              const [, refName, startStr, endStr] = locationMatch
+              const start = parseInt(startStr, 10)
+              const end = parseInt(endStr, 10)
+              
+              // Get session and fetch feature data directly using RPC
+              const session = getSession(model as any)
+              const trackConfs = getConf(session.jbrowse.configuration, 'tracks') ?? []
+              const trackConf = trackConfs.find((tc: any) => {
+                // Handle both MST configs and plain objects
+                try {
+                  return getConf(tc, 'trackId') === model.selectedTrackId
+                } catch {
+                  return tc.trackId === model.selectedTrackId || tc.configuration?.trackId === model.selectedTrackId
+                }
+              })
+              
+              if (trackConf && session.id) {
+                // Handle both MST configs and plain objects for adapter
+                let adapter
+                try {
+                  adapter = readConfObject(trackConf, ['adapter'])
+                } catch {
+                  adapter = trackConf.adapter || trackConf.configuration?.adapter
+                }
+                const rpcManager = session.rpcManager
+                const sessionId = session.id
+                
+                const queryRegion = {
+                  refName,
+                  start: start - 1, // Convert to 0-based
+                  end,
+                  assemblyName: model.selectedAssemblyId,
+                }
+                
+                const featureResults = await rpcManager.call(
+                  sessionId,
+                  'CoreGetFeatures',
+                  {
+                    sessionId,
+                    regions: [queryRegion],
+                    adapterConfig: adapter,
+                  },
+                )
+                
+                const features = Array.isArray(featureResults) ? featureResults : []
+                const matchingFeature = features.find((f: any) =>
+                  f.get?.('ID') === feature.id || f.get?.('Name') === feature.id
+                )
+                
+                if (matchingFeature) {
+                  // Extract GFF attributes from the actual feature
+                  const images = String(matchingFeature.get?.('images') || matchingFeature.get?.('image') || '')
+                  const imageCaptions = String(matchingFeature.get?.('image_captions') || matchingFeature.get?.('image_caption') || '')
+                  const imageGroup = String(matchingFeature.get?.('image_group') || matchingFeature.get?.('image_groups') || '')
+                  
+                  model.setSelectedFeature(
+                    feature.id,
+                    feature.type === 'gene' ? 'GENE' : 'NON_GENE',
+                    images,
+                    imageCaptions,
+                    imageGroup,
+                  )
+                  return
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching feature data:', error)
+          }
+          
+          // Fallback to basic selection without content
+          model.setSelectedFeature(
+            feature.id,
+            feature.type === 'gene' ? 'GENE' : 'NON_GENE',
+            '',
+            '',
+            '',
+          )
+        }
+        
+        // Start async fetch but don't await it
+        void fetchFeatureData()
       } else {
         model.setSelectedFeature(undefined)
       }

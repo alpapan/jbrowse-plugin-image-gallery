@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { observer } from 'mobx-react'
 import { isAlive } from 'mobx-state-tree'
 import { Box, Typography } from '@mui/material'
+import { getSession } from '@jbrowse/core/util'
+import { getConf, readConfObject } from '@jbrowse/core/configuration'
 import { SelectTextualDescriptionsViewF } from '../../SelectTextualDescriptionsView/components/Explainers'
 import {
   AssemblySelector,
@@ -22,6 +24,7 @@ interface FeatureOption {
   markdown_urls?: string
   descriptions?: string
   content_types?: string
+  content_type?: string
 }
 
 interface FlexibleTextualDescriptionsViewProps {
@@ -177,30 +180,100 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
       setSearchInputValue('')
       model.clearSearch()
     }
-
-    const handleFeatureSelect = (
-      feature: {
-        id: string
-        name: string
-        type: string
-        markdown_urls?: string
-        descriptions?: string
-        content_types?: string
-      } | null,
-    ) => {
-      if (feature) {
-        model.setSelectedFeature(
-          feature.id,
-          feature.type === 'gene' ? 'GENE' : 'NON_GENE',
-          feature.markdown_urls,
-          feature.descriptions,
-          feature.content_types,
-        )
+    const handleFeatureSelect = (feature: FeatureOption | null) => {
+      if (feature && feature.location) {
+        // Async operation to fetch actual feature data
+        const fetchFeatureData = async () => {
+          try {
+            // Parse location to get coordinates for fetching actual feature data
+            const locationMatch = feature.location!.match(/^(.+):(\d+)\.\.(\d+)$/)
+            if (locationMatch) {
+              const [, refName, startStr, endStr] = locationMatch
+              const start = parseInt(startStr, 10)
+              const end = parseInt(endStr, 10)
+              
+              // Get session and fetch feature data directly using RPC
+              const session = getSession(model as any)
+              const trackConfs = getConf(session.jbrowse.configuration, 'tracks') ?? []
+              const trackConf = trackConfs.find((tc: any) => {
+                // Handle both MST configs and plain objects
+                try {
+                  return getConf(tc, 'trackId') === model.selectedTrackId
+                } catch {
+                  return tc.trackId === model.selectedTrackId || tc.configuration?.trackId === model.selectedTrackId
+                }
+              })
+              
+              if (trackConf && session.id) {
+                // Handle both MST configs and plain objects for adapter
+                let adapter
+                try {
+                  adapter = readConfObject(trackConf, ['adapter'])
+                } catch {
+                  adapter = trackConf.adapter || trackConf.configuration?.adapter
+                }
+                const rpcManager = session.rpcManager
+                const sessionId = session.id
+                
+                const queryRegion = {
+                  refName,
+                  start: start - 1, // Convert to 0-based
+                  end,
+                  assemblyName: model.selectedAssemblyId,
+                }
+                
+                const featureResults = await rpcManager.call(
+                  sessionId,
+                  'CoreGetFeatures',
+                  {
+                    sessionId,
+                    regions: [queryRegion],
+                    adapterConfig: adapter,
+                  },
+                )
+                
+                const features = Array.isArray(featureResults) ? featureResults : []
+                const matchingFeature = features.find((f: any) =>
+                  f.get?.('ID') === feature.id || f.get?.('Name') === feature.id
+                )
+                
+                if (matchingFeature) {
+                  // Extract GFF attributes from the actual feature
+                  const markdownUrls = String(matchingFeature.get?.('markdown_urls') || matchingFeature.get?.('markdown_url') || '')
+                  const descriptions = String(matchingFeature.get?.('descriptions') || matchingFeature.get?.('description') || '')
+                  const contentTypes = String(matchingFeature.get?.('content_types') || matchingFeature.get?.('content_type') || '')
+                  
+                  model.setSelectedFeature(
+                    feature.id,
+                    feature.type === 'gene' ? 'GENE' : 'NON_GENE',
+                    markdownUrls,
+                    descriptions,
+                    contentTypes,
+                  )
+                  return
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching feature data:', error)
+          }
+          
+          // Fallback to basic selection without content
+          model.setSelectedFeature(
+            feature.id,
+            feature.type === 'gene' ? 'GENE' : 'NON_GENE',
+            '',
+            '',
+            '',
+          )
+        }
+        
+        // Start async fetch but don't await it
+        void fetchFeatureData()
       } else {
         model.setSelectedFeature(undefined)
       }
     }
-
     const handleClearSelections = () => {
       model.clearSelections()
       setSearchInputValue('')

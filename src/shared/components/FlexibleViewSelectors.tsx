@@ -15,7 +15,7 @@ import {
 import { getAssemblyDisplayName } from '../flexibleViewUtils'
 
 // Common types for feature options
-interface FeatureOption {
+export interface FeatureOption {
   id: string
   name: string
   type: string
@@ -26,6 +26,7 @@ interface FeatureOption {
   markdown_urls?: string
   descriptions?: string
   content_types?: string
+  content_type?: string
   // Image specific fields
   images?: string
   image_captions?: string
@@ -108,13 +109,7 @@ export const AssemblySelector: React.FC<AssemblySelectorProps> = ({
   onAssemblyChange,
   disabled = false,
 }) => {
-  // console.log('🔥 DEBUG: AssemblySelector render - availableAssemblies:', availableAssemblies?.length || 0, availableAssemblies)
-  // console.log('🔥 DEBUG: AssemblySelector render - selectedAssemblyId:', selectedAssemblyId)
-  // console.log('🔥 DEBUG: AssemblySelector render - onAssemblyChange type:', typeof onAssemblyChange)
-
   const handleChange = (value: string) => {
-    // console.log('🔥 DEBUG: AssemblySelector handleChange called with:', value)
-    // console.log('🔥 DEBUG: AssemblySelector calling onAssemblyChange')
     onAssemblyChange(value)
   }
 
@@ -218,45 +213,12 @@ export const FeatureSearchAutocomplete: React.FC<
   hasSearchTerm,
   contentType,
 }) => {
-  // DEBUG: Log every render with key props
-  console.log('🔥 FeatureSearchAutocomplete RENDER START', {
-    timestamp: Date.now(),
-    searchInputValue,
-    featuresLength: features?.length || 0,
-    hasSearchTerm,
-    isSearching,
-    selectedTrackId,
-    actualFeatures: features?.slice(0, 2)?.map(f => f.name || f.id), // Log first 2 feature names
-  })
-  // Add debugging logs
-  console.log('🔍 DEBUG: FeatureSearchAutocomplete render', {
-    selectedTrackId,
-    featuresCount: features?.length || 0,
-    isSearching,
-    canSearch,
-    hasSearchTerm,
-    searchInputValue,
-    featuresType: Array.isArray(features) ? 'array' : typeof features,
-  })
-
   // Ensure features is always an array
   const safeFeatures = Array.isArray(features) ? features : []
-
-  // Debug the open condition specifically
-  const shouldOpen = safeFeatures.length > 0 && hasSearchTerm
-  console.log('🔍 DEBUG: Dropdown open condition', {
-    safeFeaturesLength: safeFeatures.length,
-    hasSearchTerm,
-    shouldOpen,
-    safeFeatures: safeFeatures.slice(0, 3), // Log first 3 items to avoid spam
-  })
 
   // Only hide if we have no track selected AND no search results to show
   // Allow rendering even without selectedTrackId if there are features to display
   if (!selectedTrackId && safeFeatures.length === 0) {
-    console.log(
-      '🔍 DEBUG: FeatureSearchAutocomplete - returning null (no track and no features)',
-    )
     return null
   }
 
@@ -271,13 +233,12 @@ export const FeatureSearchAutocomplete: React.FC<
         disableListWrap
         inputValue={searchInputValue}
         open={safeFeatures.length > 0 && hasSearchTerm}
+        slotProps={{
+          popper: {
+            sx: { zIndex: 9999 }, // Very high z-index to ensure dropdown appears above other content
+          },
+        }}
         onInputChange={(_, value, reason) => {
-          console.log(
-            '🔍 DEBUG: onInputChange - value:',
-            value,
-            'reason:',
-            reason,
-          )
           // Handle all input changes except reset and selectOption
           // Reset events can cause focus loss, so we ignore them
           if (reason !== 'reset' && reason !== 'selectOption') {
@@ -305,12 +266,10 @@ export const FeatureSearchAutocomplete: React.FC<
         filterOptions={options => options}
         getOptionLabel={option => {
           if (typeof option === 'string') return option
-          // Use locString if available (from BaseResult), otherwise fallback to location
-          const displayLocation = option.locString ?? option.location ?? ''
-          return `${option.name ?? option.id} (${option.type}) ${
-            displayLocation ? `• ${displayLocation}` : ''
-          }`
+          // Use simple display for selected value to avoid parsing issues
+          return option.name ?? option.id
         }}
+        isOptionEqualToValue={(option, value) => option.id === value.id}
         loading={isSearching}
         disabled={!canSearch}
         renderInput={params => (
@@ -330,10 +289,11 @@ export const FeatureSearchAutocomplete: React.FC<
               ),
             }}
             onPaste={e => {
+              // Prevent default to avoid duplication
+              e.preventDefault()
               // Ensure paste events trigger search
               const pastedValue = e.clipboardData.getData('text')
               if (pastedValue) {
-                console.log('🔍 DEBUG: onPaste - pastedValue:', pastedValue)
                 onSearchInputChange(pastedValue)
               }
             }}

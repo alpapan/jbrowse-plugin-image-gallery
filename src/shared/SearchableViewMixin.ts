@@ -224,6 +224,7 @@ export const SearchableViewMixin = (self: any) => ({
       self.selectedFeatureType = 'GENE'
 
       try {
+        // Use default contentExtractor since BaseResult doesn't have the needed attributes
         const searchFn = searchFeatureTextIndex()
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const results = yield searchFn.call(
@@ -231,26 +232,8 @@ export const SearchableViewMixin = (self: any) => ({
           self as SearchableViewModel,
         )
 
-        console.log(
-          '🔍 DEBUG: Mixin searchFeatures - results received:',
-          results?.length || 0,
-        )
-        console.log(
-          '🔍 DEBUG: Mixin searchFeatures - self.searchResults before replace:',
-          self.searchResults?.length || 0,
-        )
-
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         self.searchResults.replace(results as SearchResult[])
-
-        console.log(
-          '🔍 DEBUG: Mixin searchFeatures - self.searchResults after replace:',
-          self.searchResults?.length || 0,
-        )
-        console.log(
-          '🔍 DEBUG: Mixin searchFeatures - self.features getter:',
-          self.features?.length || 0,
-        )
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Error searching features:', e)
