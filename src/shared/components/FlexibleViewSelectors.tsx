@@ -218,19 +218,38 @@ export const FeatureSearchAutocomplete: React.FC<
   hasSearchTerm,
   contentType,
 }) => {
+  // DEBUG: Log every render with key props
+  console.log('🔥 FeatureSearchAutocomplete RENDER START', {
+    timestamp: Date.now(),
+    searchInputValue,
+    featuresLength: features?.length || 0,
+    hasSearchTerm,
+    isSearching,
+    selectedTrackId,
+    actualFeatures: features?.slice(0, 2)?.map(f => f.name || f.id), // Log first 2 feature names
+  })
   // Add debugging logs
-  // console.log('🔍 DEBUG: FeatureSearchAutocomplete render', {
-  //   selectedTrackId,
-  //   featuresCount: features?.length || 0,
-  //   isSearching,
-  //   canSearch,
-  //   hasSearchTerm,
-  //   searchInputValue,
-  //   featuresType: Array.isArray(features) ? 'array' : typeof features,
-  // })
+  console.log('🔍 DEBUG: FeatureSearchAutocomplete render', {
+    selectedTrackId,
+    featuresCount: features?.length || 0,
+    isSearching,
+    canSearch,
+    hasSearchTerm,
+    searchInputValue,
+    featuresType: Array.isArray(features) ? 'array' : typeof features,
+  })
 
   // Ensure features is always an array
   const safeFeatures = Array.isArray(features) ? features : []
+
+  // Debug the open condition specifically
+  const shouldOpen = safeFeatures.length > 0 && hasSearchTerm
+  console.log('🔍 DEBUG: Dropdown open condition', {
+    safeFeaturesLength: safeFeatures.length,
+    hasSearchTerm,
+    shouldOpen,
+    safeFeatures: safeFeatures.slice(0, 3), // Log first 3 items to avoid spam
+  })
 
   // Only hide if we have no track selected AND no search results to show
   // Allow rendering even without selectedTrackId if there are features to display
@@ -249,14 +268,31 @@ export const FeatureSearchAutocomplete: React.FC<
   return (
     <Box sx={{ mb: 2 }}>
       <Autocomplete
-        key={`search-${selectedTrackId}`}
-        freeSolo
         disableListWrap
         inputValue={searchInputValue}
+        open={safeFeatures.length > 0 && hasSearchTerm}
         onInputChange={(_, value, reason) => {
+          console.log(
+            '🔍 DEBUG: onInputChange - value:',
+            value,
+            'reason:',
+            reason,
+          )
+          // Handle all input changes except reset and selectOption
+          // Reset events can cause focus loss, so we ignore them
           if (reason !== 'reset' && reason !== 'selectOption') {
             onSearchInputChange(value || '')
           }
+          // Clear results when input is completely empty
+          if (!value || value.trim() === '') {
+            onSearchInputChange('')
+          }
+        }}
+        onOpen={() => {
+          // Ensure dropdown opens when user interacts
+        }}
+        onClose={() => {
+          // Allow natural close behavior
         }}
         onChange={(_, value) => {
           if (typeof value === 'object' && value !== null) {
@@ -266,6 +302,7 @@ export const FeatureSearchAutocomplete: React.FC<
           }
         }}
         options={safeFeatures}
+        filterOptions={options => options}
         getOptionLabel={option => {
           if (typeof option === 'string') return option
           // Use locString if available (from BaseResult), otherwise fallback to location
@@ -275,8 +312,6 @@ export const FeatureSearchAutocomplete: React.FC<
           }`
         }}
         loading={isSearching}
-        open={isSearching || (safeFeatures.length > 0 && hasSearchTerm)}
-        onClose={() => {}}
         disabled={!canSearch}
         renderInput={params => (
           <TextField
@@ -293,6 +328,14 @@ export const FeatureSearchAutocomplete: React.FC<
                   {params.InputProps.endAdornment}
                 </>
               ),
+            }}
+            onPaste={e => {
+              // Ensure paste events trigger search
+              const pastedValue = e.clipboardData.getData('text')
+              if (pastedValue) {
+                console.log('🔍 DEBUG: onPaste - pastedValue:', pastedValue)
+                onSearchInputChange(pastedValue)
+              }
             }}
           />
         )}

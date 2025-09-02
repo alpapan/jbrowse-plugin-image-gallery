@@ -95,11 +95,15 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
     const searchHandler = useCallback(
       (value: string) => {
         model.setSearchTerm(value)
-        if (value.trim()) {
+        const trimmedValue = value.trim()
+
+        if (trimmedValue.length >= 3) {
           model.searchFeatures()
-        } else {
+        } else if (trimmedValue.length === 0) {
+          // Clear search when input is completely empty
           model.clearSearch()
         }
+        // For 1-2 characters, do nothing (don't search, don't clear existing results)
       },
       [model],
     )
@@ -141,6 +145,17 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
         setSearchInputValue(model.searchTerm ?? '')
       }
     }, [model.searchTerm, searchInputValue])
+
+    // Force re-render when search results change to ensure MobX reactivity
+    const [, forceUpdate] = useState({})
+    useEffect(() => {
+      // Force component to re-render when searchResults length changes
+      forceUpdate({})
+      console.log(
+        '🔄 DEBUG: Forced re-render due to searchResults change:',
+        model.searchResults.length,
+      )
+    }, [model.searchResults.length])
 
     const handleAssemblyChange = (assemblyId: string) => {
       // console.log('🎯 DEBUG: TextualDescriptionsView handleAssemblyChange called with:', assemblyId)
@@ -222,7 +237,7 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
             setSearchInputValue(value)
             searchHandler(value)
           }}
-          features={model.features}
+          features={model.searchResults}
           onFeatureSelect={handleFeatureSelect}
           isSearching={model.isSearching}
           canSearch={model.canSearch}

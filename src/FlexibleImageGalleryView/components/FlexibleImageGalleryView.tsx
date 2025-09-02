@@ -97,13 +97,21 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
       (value: string) => {
         console.log('🔍 DEBUG: Component searchHandler called with:', value)
         model.setSearchTerm(value)
-        if (value.trim()) {
-          console.log('🔍 DEBUG: Component calling model.searchFeatures()')
+        const trimmedValue = value.trim()
+
+        if (trimmedValue.length >= 3) {
+          console.log(
+            '🔍 DEBUG: Component calling model.searchFeatures() - meets min length',
+          )
           model.searchFeatures()
-        } else {
-          console.log('🔍 DEBUG: Component calling model.clearSearch()')
+        } else if (trimmedValue.length === 0) {
+          // Clear search when input is completely empty
+          console.log(
+            '🔍 DEBUG: Component calling model.clearSearch() - empty input',
+          )
           model.clearSearch()
         }
+        // For 1-2 characters, do nothing (don't search, don't clear existing results)
       },
       [model],
     )
@@ -202,7 +210,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
             setSearchInputValue(value)
             searchHandler(value)
           }}
-          features={model.features}
+          features={model.searchResults}
           onFeatureSelect={handleFeatureSelect}
           isSearching={model.isSearching}
           canSearch={model.canSearch}
