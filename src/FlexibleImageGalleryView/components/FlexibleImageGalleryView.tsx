@@ -145,6 +145,14 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
       }
     }, [model.searchTerm, searchInputValue])
 
+    // Force re-render when search results change to ensure MobX reactivity
+    const [, forceUpdate] = useState({})
+    useEffect(() => {
+      // Force component to re-render when searchResults length changes
+      forceUpdate({})
+      console.log('🔄 DEBUG: ImageGallery forced re-render due to searchResults change:', model.searchResults.length)
+    }, [model.searchResults.length])
+
     const handleAssemblyChange = (assemblyId: string) => {
       model.setSelectedAssembly(assemblyId ?? undefined)
     }
