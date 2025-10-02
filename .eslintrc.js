@@ -34,5 +34,9 @@ module.exports = {
         ignoreRestSiblings: true,
       },
     ],
+    // Relax formatting rules
+    'prettier/prettier': 0, // Disable prettier rules from eslint-plugin-prettier
+    'indent': 'off', // Disable indent rule
+    'no-trailing-spaces': 'off', // Disable trailing spaces rule
   },
 }

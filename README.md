@@ -217,7 +217,7 @@ Select any feature with image or markdown data. The appropriate views appear aut
 - **Text Formatting**: *italic*, **bold**, ~~strikethrough~~
 - **Lists**: Ordered and unordered lists with nesting
 - **Links**: `[text](url)` format
-- **Images**: `![alt](url)` format (embedded within markdown)
+- **Images**: `![alt](url)` format (embedded within markdown) - **Fully Supported** - Images are automatically fetched and rendered when URLs are provided in markdown content
 - **Code**: Inline `code` and fenced code blocks with syntax highlighting
 - **Tables**: Pipe-delimited tables with alignment
 - **Blockquotes**: `> quoted text`
@@ -509,6 +509,13 @@ filename.jpg
 - Ensure CORS headers for cross-domain documents
 - Check browser console for network errors
 - Verify markdown syntax is valid
+
+### Images Not Displaying in Markdown (SelectTextualDescriptionsView)
+- Verify image URLs in markdown use correct `![alt](url)` syntax
+- Check image URLs are accessible from the browser
+- Ensure CORS headers for cross-domain images
+- Check browser console for image loading errors
+- Verify image formats are supported (JPG, PNG, GIF, SVG, WEBP, etc.)
 
 ### Cytoscape Diagrams Not Rendering
 - Ensure JSON format is valid in cytoscape code blocks

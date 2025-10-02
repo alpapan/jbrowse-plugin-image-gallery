@@ -2,9 +2,13 @@
   "extends": "../tsconfig",
   "compilerOptions": {
     "rootDir": ".",
-    "lib": ["ES2019"],
-    "module": "commonjs",
-    "target": "ES2019"
+    "lib": ["ES2019", "DOM"],
+    "module": "ESNext",
+    "target": "ES2019",
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "moduleResolution": "node"
   },
-  "include": ["."]
+  "include": ["."],
+  "exclude": ["../node_modules"]
 }

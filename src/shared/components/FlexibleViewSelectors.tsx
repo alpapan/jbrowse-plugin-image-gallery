@@ -255,12 +255,15 @@ export const FeatureSearchAutocomplete: React.FC<
         onClose={() => {
           // Allow natural close behavior
         }}
-        onChange={(_, value) => {
+        onChange={(_, value, reason) => {
+          console.log('🎯 DEBUG: Autocomplete onChange called with:', value, 'reason:', reason)
           if (typeof value === 'object' && value !== null) {
             onFeatureSelect(value)
-          } else {
+          } else if (reason === 'selectOption') {
+            // Only clear selection if user explicitly cleared, not on outside click
             onFeatureSelect(null)
           }
+          // For 'blur' or other reasons, don't clear the selection
         }}
         options={safeFeatures}
         filterOptions={options => options}

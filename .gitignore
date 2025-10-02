@@ -129,4 +129,3 @@ cypress/screenshots
 test.gff3
 .kilo*
 type_docs
-other_plugin_examples
