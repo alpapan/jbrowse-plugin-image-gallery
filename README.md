@@ -1,4 +1,4 @@
-# JBrowse Plugin Rich Annotations
+# jbrowse-plugin-rich-annotations-plugin
 
 A comprehensive JBrowse 2 plugin that provides two complementary views for displaying feature-associated content:
 
@@ -27,8 +27,7 @@ Please make sure you run `jbrowse text-index --perTrack --force` in the .jbrowse
 
 Option 1:
 Go to https://github.com/alpapan/jbrowse-plugin-image-gallery/releases
-download the jbrowse-plugin-image-gallery.umd.production.min.js
-
+download the jbrowse-plugin-rich-annotations-plugin.umd.development.js
 Option 2: For developers
 
 
@@ -49,7 +48,7 @@ Add to your JBrowse 2 config.json:
   "plugins": [
     {
       "name": "RichAnnotationsPlugin",
-      "url": "./jbrowse-plugin-image-gallery.umd.production.min.js"
+      "url": "./dist/jbrowse-plugin-rich-annotations-plugin.umd.development.js"
     }
   ]
 }

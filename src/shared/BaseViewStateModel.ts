@@ -1,6 +1,6 @@
 import { MenuItem } from '@jbrowse/core/ui'
 import { ElementId } from '@jbrowse/core/util/types/mst'
-import { types, getRoot } from 'mobx-state-tree'
+import { IAnyModelType, types, getRoot } from 'mobx-state-tree'
 import { getSession } from '@jbrowse/core/util'
 import { getConf } from '@jbrowse/core/configuration'
 import PluginManager from '@jbrowse/core/PluginManager'
@@ -19,7 +19,7 @@ export function deduplicateContent(content: string[]): string[] {
 }
 
 // Base view state model with all common functionality
-export const BaseViewStateModel = types
+export const BaseViewStateModel: IAnyModelType = types
   .model('BaseViewStateModel', {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     id: ElementId as any,

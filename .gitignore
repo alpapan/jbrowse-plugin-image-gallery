@@ -129,3 +129,4 @@ cypress/screenshots
 test.gff3
 .kilo*
 type_docs
+package-lock.json

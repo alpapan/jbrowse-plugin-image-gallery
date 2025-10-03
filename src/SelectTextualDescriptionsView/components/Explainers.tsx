@@ -438,6 +438,7 @@ const NewickTreeRenderer: React.FC<{ data: string }> = ({ data }) => {
 
 // Custom markdown components
 const MarkdownComponents = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   code: ({ inline, className, children, ...props }: CodeComponentProps) => {
     const match = /language-(\w+)/.exec(className ?? '')
     const language = match ? match[1] : ''
@@ -479,7 +480,10 @@ const MarkdownComponents = {
     }
 
     return !inline && match ? (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       <SyntaxHighlighter
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        {...(props as any)}
         style={tomorrow}
         language={language}
         PreTag="div"
@@ -487,7 +491,6 @@ const MarkdownComponents = {
           margin: '1em 0',
           borderRadius: '4px',
         }}
-        {...props}
       >
         {childrenString.replace(/\n$/, '')}
       </SyntaxHighlighter>

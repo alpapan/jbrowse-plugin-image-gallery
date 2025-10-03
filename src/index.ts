@@ -4,7 +4,6 @@ import ViewType from '@jbrowse/core/pluggableElementTypes/ViewType'
 import { AbstractSessionModel, isAbstractMenuManager } from '@jbrowse/core/util'
 import { Feature } from '@jbrowse/core/util/simpleFeature'
 import { autorun } from 'mobx'
-import { version } from '../package.json'
 import {
   ReactComponent as SelectImageGalleryViewReactComponent,
   stateModel as selectImageGalleryViewStateModel,
@@ -44,7 +43,7 @@ interface FeatureSummary {
 
 export default class RichAnnotationsPlugin extends Plugin {
   name = 'RichAnnotationsPlugin'
-  version = version
+  version = '0.0.1'
   private manuallyClosedViews = new Set<string>()
   private lastSelectedFeatureId: string | undefined = undefined
 

@@ -2,14 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Box, Typography } from '@mui/material'
 import { observer } from 'mobx-react'
 import { isAlive } from 'mobx-state-tree'
-import { getSession } from '@jbrowse/core/util'
-import { readConfObject } from '@jbrowse/core/configuration'
+import { getSession, AbstractSessionModel } from '@jbrowse/core/util'
 import {
   getTrackId,
   getAdapterConfig,
   getTracksFromSession,
 } from '../../shared/configUtils'
-import ImageGalleryView from '../../SelectImageGalleryView/components/ImageGalleryView'
 import { SelectImageGalleryViewF } from '../../SelectImageGalleryView/components/Explainers'
 import {
   AssemblySelector,
@@ -82,7 +80,7 @@ interface FlexibleImageGalleryViewProps {
     ) => void
     clearSelections: () => void
     setLoadingFeatures: (loading: boolean) => void
-  }
+  } & AbstractSessionModel // Add AbstractSessionModel to the model type
 }
 
 const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps> =
@@ -191,7 +189,7 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
               const end = parseInt(endStr, 10)
 
               // Get session and fetch feature data directly using RPC
-              const session = getSession(model as any)
+              const session = getSession(model)
               console.log('🎯 DEBUG: Got session:', !!session)
               const trackConfs = getTracksFromSession(session)
               console.log('🎯 DEBUG: trackConfs length:', trackConfs.length)
@@ -200,16 +198,19 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
                 model.selectedTrackId,
               )
 
-              const trackConf = trackConfs.find((tc: any) => {
-                const tcTrackId = getTrackId(tc)
-                console.log(
-                  '🎯 DEBUG: Comparing track IDs:',
-                  tcTrackId,
-                  'vs',
-                  model.selectedTrackId,
-                )
-                return tcTrackId === model.selectedTrackId
-              })
+              const trackConf = trackConfs.find(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (tc: any) => {
+                  const tcTrackId = getTrackId(tc)
+                  console.log(
+                    '🎯 DEBUG: Comparing track IDs:',
+                    tcTrackId,
+                    'vs',
+                    model.selectedTrackId,
+                  )
+                  return tcTrackId === model.selectedTrackId
+                },
+              )
               console.log('🎯 DEBUG: Found trackConf:', !!trackConf)
 
               if (trackConf && session.id) {
@@ -274,22 +275,23 @@ const FlexibleImageGalleryViewComponent: React.FC<FlexibleImageGalleryViewProps>
                     }
                   })
                 }
-
-                const matchingFeature = features.find((f: any) => {
-                  // Use the same comprehensive ID extraction as flexibleViewUtils.ts
-                  const fId =
-                    f.get?.('ID') ??
-                    f.get?.('id') ??
-                    f.get?.('Name') ??
-                    f.get?.('name') ??
-                    f.id?.() ??
-                    ''
-                  const fName =
-                    f.get?.('Name') ??
-                    f.get?.('name') ??
-                    f.get?.('ID') ??
-                    f.get?.('id') ??
-                    'Unnamed feature'
+                const matchingFeature = features.find(
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (f: any) => {
+                    // Use the same comprehensive ID extraction as flexibleViewUtils.ts
+                    const fId =
+                      f.get?.('ID') ??
+                      f.get?.('id') ??
+                      f.get?.('Name') ??
+                      f.get?.('name') ??
+                      f.id?.() ??
+                      ''
+                    const fName =
+                      f.get?.('Name') ??
+                      f.get?.('name') ??
+                      f.get?.('ID') ??
+                      f.get?.('id') ??
+                      'Unnamed feature'
 
                   console.log(
                     '🎯 DEBUG: Checking feature ID/Name:',

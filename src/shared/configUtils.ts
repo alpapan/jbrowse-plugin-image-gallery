@@ -1,4 +1,4 @@
-import { readConfObject, getConf } from '@jbrowse/core/configuration'
+import { readConfObject } from '@jbrowse/core/configuration'
 
 // Simple utilities to safely access configuration values
 
@@ -6,6 +6,7 @@ import { readConfObject, getConf } from '@jbrowse/core/configuration'
  * Safely get tracks from session using the same pattern as flexibleViewUtils.ts
  * This matches how the search system successfully accesses tracks
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getTracksFromSession(session: any): unknown[] {
   try {
     const { jbrowse } = session
@@ -54,6 +55,7 @@ export function getTracksFromSession(session: any): unknown[] {
  * Safely get track ID from track configuration
  * Uses direct property access as recommended in AGENT.md
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getTrackId(trackConf: any): string {
   return String(trackConf?.trackId ?? trackConf?.configuration?.trackId ?? '')
 }
@@ -61,6 +63,7 @@ export function getTrackId(trackConf: any): string {
 /**
  * Safely get adapter configuration from track configuration
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getAdapterConfig(trackConf: any): unknown {
   try {
     return readConfObject(trackConf, ['adapter'])
@@ -72,6 +75,7 @@ export function getAdapterConfig(trackConf: any): unknown {
 /**
  * Safely get assembly names from track configuration
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getAssemblyNames(trackConf: any): string[] {
   const directAssemblyNames =
     trackConf?.assemblyNames ?? trackConf?.configuration?.assemblyNames

@@ -1,4 +1,4 @@
-import { types, isAlive } from 'mobx-state-tree'
+import { types } from 'mobx-state-tree'
 import { BaseViewStateModel } from '../shared/BaseViewStateModel'
 import {
   SearchableViewMixin,

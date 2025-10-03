@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { observer } from 'mobx-react'
 import { isAlive } from 'mobx-state-tree'
 import { Box, Typography } from '@mui/material'
-import { getSession } from '@jbrowse/core/util'
-import { readConfObject } from '@jbrowse/core/configuration'
+import { getSession, AbstractSessionModel } from '@jbrowse/core/util'
 import {
   getTrackId,
   getAdapterConfig,
@@ -92,7 +91,7 @@ interface FlexibleTextualDescriptionsViewProps {
     setSearchTerm: (term: string) => void
     searchFeatures: () => void
     clearSearch: () => void
-  }
+  } & AbstractSessionModel // Add AbstractSessionModel to the model type
 }
 
 const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescriptionsViewProps> =
@@ -200,9 +199,10 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
               const end = parseInt(endStr, 10)
 
               // Get session and fetch feature data directly using RPC
-              const session = getSession(model as any)
+              const session = getSession(model)
               const trackConfs = getTracksFromSession(session)
               const trackConf = trackConfs.find(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (tc: any) => getTrackId(tc) === model.selectedTrackId,
               )
 
@@ -233,19 +233,22 @@ const FlexibleTextualDescriptionsViewComponent: React.FC<FlexibleTextualDescript
                   ? featureResults
                   : []
                 const matchingFeature = features.find(
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   (f: any) => {
                     // Use the same comprehensive ID extraction as flexibleViewUtils.ts
-                    const fId = f.get?.('ID') ??
-                               f.get?.('id') ??
-                               f.get?.('Name') ??
-                               f.get?.('name') ??
-                               f.id?.() ??
-                               ''
-                    const fName = f.get?.('Name') ??
-                                 f.get?.('name') ??
-                                 f.get?.('ID') ??
-                                 f.get?.('id') ??
-                                 'Unnamed feature'
+                    const fId =
+                      f.get?.('ID') ??
+                      f.get?.('id') ??
+                      f.get?.('Name') ??
+                      f.get?.('name') ??
+                      f.id?.() ??
+                      ''
+                    const fName =
+                      f.get?.('Name') ??
+                      f.get?.('name') ??
+                      f.get?.('ID') ??
+                      f.get?.('id') ??
+                      'Unnamed feature'
 
                     console.log('🎯 DEBUG: Checking feature ID/Name:', fId, fName, 'against:', feature.id)
                     return fId === feature.id || fName === feature.id
